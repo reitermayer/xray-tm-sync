@@ -45,6 +45,13 @@ The split from the former single skill `jre-xray-uipath` into these two skills i
    - Run `sandbox add --xray-project UIP --tm-project XCA`.
    - Run a `reset --reseed` dry run, then `--yes`. This is the first real run of Xray `createTest`/`deleteTest`.
    - Then run the full demo once.
+7. **Command trail.** Log every `uip` call and Xray request to `.xray-tm-sync/evidence/<timestamp>.jsonl` and write a replayable `commands.sh`, so a pipeline can rerun the same calls without the agent.
+8. **Student install guide.** Done as a draft in `docs/INSTALL.md`. Every student uses their own Xray and TM accounts.
+   - The demo outline is in `docs/DEMO.md`. Chapter 3b (real automation from UiPath Studio for Mac) is still open.
+   - Xray secrets now live in `~/.config/xray-tm-sync/xray.env` (mode 600); environment variables override them.
+9. **Manager deck for UiPath and LGT managers.** Shows the value added, built around a Camtasia screen recording of the demo.
+   - Slides go in `My Drive/UiPath/MVP 2026/Projects/xray-tm-sync/slides/`, in the style of the "WebMCP Adapter Demo" artifact.
+   - Write a recording script and shot list for the screen recording.
 
 ## Demo flow (target)
 
@@ -106,14 +113,14 @@ xray-tm-sync/                       production skill
 xray-tm-demo/                       demo skill (needs xray-tm-sync installed next to it)
   assets/seed-stock-trading.json    8 demo Xray tests + 1 Xray test set
   scripts/xray_tm_demo.py           sandbox | seed | execute | report | reset
+docs/INSTALL.md, docs/DEMO.md          student install guide, demo chapters
 tests/                              pytest + fake `uip` (in-memory TM) + recorded GraphQL pages
 ```
 
 ## Use
 
 ```bash
-export XRAY_CLIENT_ID=… XRAY_CLIENT_SECRET=…        # Jira → Apps → Xray → API Keys
-export XRAY_REGION=eu XRAY_JIRA_BASE_URL=https://acme.atlassian.net   # optional
+# Xray API key in ~/.config/xray-tm-sync/xray.env (chmod 600) or as env vars — see docs/INSTALL.md
 S=~/.claude/skills/xray-tm-sync/scripts/xray_tm_sync.py
 D=~/.claude/skills/xray-tm-demo/scripts/xray_tm_demo.py
 

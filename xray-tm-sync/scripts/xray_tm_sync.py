@@ -114,18 +114,38 @@ def xray_base_url() -> str:
     return f"https://{host}"
 
 
+def xray_secrets_file() -> Path:
+    return Path(os.environ.get("XRAY_TM_SYNC_ENV", Path.home() / ".config" / "xray-tm-sync" / "xray.env")).expanduser()
+
+
+def load_xray_secrets() -> None:
+    """Fill missing XRAY_* variables from the secrets file. Environment variables always win."""
+    path = xray_secrets_file()
+    if not path.is_file():
+        return
+    if path.stat().st_mode & 0o077:
+        raise IntakeError(f"{path} is readable by other users. Run: chmod 600 '{path}'")
+    for line in path.read_text().splitlines():
+        name, sep, value = line.strip().removeprefix("export ").partition("=")
+        name = name.strip()
+        if sep and name.startswith("XRAY_") and not os.environ.get(name):
+            os.environ[name] = value.strip().strip("'\"")
+
+
 class XrayClient:
     """Xray Cloud API v2: client-credential JWT (24 h, memory only) + paged GraphQL."""
 
     def __init__(self, transport: Any = None) -> None:
         import httpx  # imported lazily so offline subcommands don't need it
 
+        load_xray_secrets()
         self.client_id = os.environ.get("XRAY_CLIENT_ID", "").strip()
         self.client_secret = os.environ.get("XRAY_CLIENT_SECRET", "").strip()
         if not self.client_id or not self.client_secret:
             raise IntakeError(
                 "XRAY_CLIENT_ID / XRAY_CLIENT_SECRET are not set. Create an API key in "
-                "Jira → Apps → Xray → API Keys and export both variables."
+                f"Jira → Apps → Xray → API Keys and put both in {xray_secrets_file()} (chmod 600), "
+                "or export them as environment variables."
             )
         self.base = xray_base_url()
         self.http = httpx.Client(timeout=60, transport=transport)
