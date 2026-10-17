@@ -1,0 +1,329 @@
+[
+  {
+    "data": {
+      "page": {
+        "total": 4,
+        "start": 0,
+        "limit": 2,
+        "results": [
+          {
+            "issueId": "10101",
+            "projectId": "10000",
+            "lastModified": "2026-10-10T08:00:00Z",
+            "testType": {
+              "name": "Manual",
+              "kind": "Steps"
+            },
+            "folder": {
+              "path": "/Login/Smoke"
+            },
+            "gherkin": null,
+            "unstructured": null,
+            "preconditions": {
+              "total": 1,
+              "results": [
+                {
+                  "issueId": "10050",
+                  "definition": "A registered user exists",
+                  "preconditionType": {
+                    "name": "Manual",
+                    "kind": "Steps"
+                  },
+                  "jira": {
+                    "key": "CALC-50",
+                    "summary": "Registered user"
+                  }
+                }
+              ]
+            },
+            "jira": {
+              "key": "CALC-101",
+              "summary": "Login with valid credentials",
+              "description": {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Checks the happy path."
+                      }
+                    ]
+                  },
+                  {
+                    "type": "bulletList",
+                    "content": [
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "Chrome"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "Edge"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "labels": [
+                "smoke",
+                "login page"
+              ],
+              "status": {
+                "name": "Ready"
+              },
+              "updated": "2026-10-10T08:00:00.000+0000"
+            },
+            "steps": [
+              {
+                "id": "s1",
+                "action": "Open the login page",
+                "data": "",
+                "result": "Login form is shown",
+                "calledTestIssueId": null
+              },
+              {
+                "id": "s2",
+                "action": "Enter user and password",
+                "data": "user=alice\npassword=***",
+                "result": "",
+                "calledTestIssueId": null
+              },
+              {
+                "id": "s3",
+                "action": "Click *Sign in*",
+                "data": "",
+                "result": "Dashboard is shown",
+                "calledTestIssueId": null
+              }
+            ],
+            "warnings": [],
+            "testSets": {
+              "total": 2,
+              "results": [
+                {
+                  "issueId": "10200",
+                  "jira": {
+                    "key": "CALC-200",
+                    "summary": "Login regression"
+                  }
+                },
+                {
+                  "issueId": "10201",
+                  "jira": {
+                    "key": "CALC-201",
+                    "summary": "Smoke"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "issueId": "10102",
+            "projectId": "10000",
+            "lastModified": "2026-10-11T09:30:00Z",
+            "testType": {
+              "name": "Cucumber",
+              "kind": "Gherkin"
+            },
+            "folder": {
+              "path": "/Login"
+            },
+            "gherkin": "Scenario: Locked account\n  Given a locked user\n  When they sign in\n  Then an error is shown",
+            "unstructured": null,
+            "preconditions": {
+              "total": 0,
+              "results": []
+            },
+            "jira": {
+              "key": "CALC-102",
+              "summary": "Locked account cannot sign in",
+              "description": "h3. Wiki markup description\nStays as is.",
+              "labels": [],
+              "status": {
+                "name": "Ready"
+              },
+              "updated": "2026-10-11T09:30:00.000+0000"
+            },
+            "steps": [],
+            "warnings": [],
+            "testSets": {
+              "total": 1,
+              "results": [
+                {
+                  "issueId": "10200",
+                  "jira": {
+                    "key": "CALC-200",
+                    "summary": "Login regression"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "data": {
+      "page": {
+        "total": 4,
+        "start": 2,
+        "limit": 2,
+        "results": [
+          {
+            "issueId": "10103",
+            "projectId": "10000",
+            "lastModified": "2026-10-12T10:00:00Z",
+            "testType": {
+              "name": "Generic",
+              "kind": "Unstructured"
+            },
+            "folder": {
+              "path": "/"
+            },
+            "gherkin": null,
+            "unstructured": "Run the nightly API contract suite.",
+            "preconditions": {
+              "total": 0,
+              "results": []
+            },
+            "jira": {
+              "key": "CALC-103",
+              "summary": "API contract suite",
+              "description": null,
+              "labels": [
+                "api"
+              ],
+              "status": {
+                "name": "Ready"
+              },
+              "updated": "2026-10-12T10:00:00.000+0000"
+            },
+            "steps": [],
+            "warnings": [],
+            "testSets": {
+              "total": 0,
+              "results": []
+            }
+          },
+          {
+            "issueId": "10104",
+            "projectId": "10000",
+            "lastModified": "2026-10-13T11:00:00Z",
+            "testType": {
+              "name": "Manual",
+              "kind": "Steps"
+            },
+            "folder": {
+              "path": "/Checkout"
+            },
+            "gherkin": null,
+            "unstructured": null,
+            "preconditions": {
+              "total": 12,
+              "results": [
+                {
+                  "issueId": "10050",
+                  "definition": "A registered user exists",
+                  "preconditionType": {
+                    "name": "Manual",
+                    "kind": "Steps"
+                  },
+                  "jira": {
+                    "key": "CALC-50",
+                    "summary": "Registered user"
+                  }
+                },
+                {
+                  "issueId": "10051",
+                  "definition": "",
+                  "preconditionType": {
+                    "name": "Manual",
+                    "kind": "Steps"
+                  },
+                  "jira": {
+                    "key": "CALC-51",
+                    "summary": "Cart is empty"
+                  }
+                }
+              ]
+            },
+            "jira": {
+              "key": "CALC-104",
+              "summary": "Checkout calls the login module",
+              "description": "Modular Xray test: the first steps come from CALC-101.",
+              "labels": [
+                "checkout"
+              ],
+              "status": {
+                "name": "Ready"
+              },
+              "updated": "2026-10-13T11:00:00.000+0000"
+            },
+            "steps": [
+              {
+                "id": "s1",
+                "action": "Open the login page",
+                "data": "",
+                "result": "Login form is shown",
+                "calledTestIssueId": "10101"
+              },
+              {
+                "id": "s2",
+                "action": "Enter user and password",
+                "data": "user=alice\npassword=***",
+                "result": "",
+                "calledTestIssueId": "10101"
+              },
+              {
+                "id": "s9",
+                "action": "Add an item and check out",
+                "data": "sku=42",
+                "result": "Order confirmation",
+                "calledTestIssueId": null
+              }
+            ],
+            "warnings": [
+              "Called test CALC-101 expanded"
+            ],
+            "testSets": {
+              "total": 1,
+              "results": [
+                {
+                  "issueId": "10200",
+                  "jira": {
+                    "key": "CALC-200",
+                    "summary": "Login regression"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+]

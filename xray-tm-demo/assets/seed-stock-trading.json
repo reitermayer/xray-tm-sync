@@ -1,0 +1,48 @@
+{
+  "xray_test_set": {
+    "summary": "Stock trading regression",
+    "description": "Core buy, sell and order-management scenarios for UiPath (PATH), Oracle (ORCL) and Amazon (AMZN). Demo data seeded by jre-xray-uipath."
+  },
+  "xray_tests": [
+    {
+      "summary": "Buy UiPath stock with a market order",
+      "labels": ["stock-trading", "uipath", "buy"],
+      "description": "Verify a logged-in user with sufficient cash can buy 100 shares of UiPath (PATH) at the current market price.\nSteps: 1) Log in with a funded trading account. 2) Open the PATH stock page. 3) Select Buy, order type Market, quantity 100. 4) Review the order summary and confirm.\nExpected: the order is filled immediately, the portfolio shows 100 PATH shares, and the cash balance drops by the executed amount plus fees."
+    },
+    {
+      "summary": "Sell UiPath stock with a limit order",
+      "labels": ["stock-trading", "uipath", "sell"],
+      "description": "Verify a user holding UiPath (PATH) shares can sell 50 of them with a limit price above the current market price.\nSteps: 1) Log in with an account holding at least 50 PATH shares. 2) Open the PATH stock page. 3) Select Sell, order type Limit, quantity 50, limit price 5% above market. 4) Confirm the order.\nExpected: the order appears under Open Orders with status Pending, and the 50 shares are reserved and no longer available to sell."
+    },
+    {
+      "summary": "Buy Oracle stock with a limit order",
+      "labels": ["stock-trading", "oracle", "buy"],
+      "description": "Verify a user can place a limit order for 25 shares of Oracle (ORCL) below the current price and that it executes when the price is reached.\nSteps: 1) Log in with a funded trading account. 2) Open the ORCL stock page. 3) Select Buy, order type Limit, quantity 25, limit price 2% below market. 4) Confirm the order. 5) Wait until the market price reaches the limit price.\nExpected: the order executes at or below the limit price, and the portfolio shows 25 ORCL shares."
+    },
+    {
+      "summary": "Protect an Oracle position with a stop-loss order",
+      "labels": ["stock-trading", "oracle", "sell", "risk"],
+      "description": "Verify a user holding Oracle (ORCL) shares can attach a stop-loss order that sells automatically when the price falls.\nSteps: 1) Log in with an account holding 20 ORCL shares. 2) Open the ORCL position. 3) Add a Stop-Loss order for 20 shares at 8% below the purchase price. 4) Confirm the order.\nExpected: the stop-loss order is listed under Open Orders, and when the price drops to the stop price the 20 shares are sold at market."
+    },
+    {
+      "summary": "Buy fractional Amazon shares by dollar amount",
+      "labels": ["stock-trading", "amazon", "buy", "fractional"],
+      "description": "Verify a user can invest a fixed dollar amount in Amazon (AMZN) and receive fractional shares.\nSteps: 1) Log in with a funded trading account. 2) Open the AMZN stock page. 3) Select Buy, choose Amount instead of Quantity, enter 250 USD. 4) Confirm the order.\nExpected: the order is filled, the portfolio shows the fractional AMZN quantity (250 USD / execution price, 6 decimals), and the cash balance drops by 250 USD plus fees."
+    },
+    {
+      "summary": "Sell an entire Amazon position with a market order",
+      "labels": ["stock-trading", "amazon", "sell"],
+      "description": "Verify a user can close an Amazon (AMZN) position completely with one market sell order.\nSteps: 1) Log in with an account holding AMZN shares, including a fractional part. 2) Open the AMZN position. 3) Select Sell All, order type Market. 4) Confirm the order.\nExpected: all AMZN shares, including the fractional part, are sold, the position disappears from the portfolio, and the proceeds minus fees are credited to the cash balance."
+    },
+    {
+      "summary": "Reject a UiPath purchase with insufficient funds",
+      "labels": ["stock-trading", "uipath", "buy", "negative"],
+      "description": "Negative test: verify a purchase is rejected when the cash balance is too low.\nSteps: 1) Log in with an account holding less cash than the order value. 2) Open the PATH stock page. 3) Select Buy, order type Market, quantity 1000. 4) Try to confirm the order.\nExpected: the order is rejected with the message \"Insufficient funds\", no order is created, and the cash balance is unchanged."
+    },
+    {
+      "summary": "Cancel an open Oracle limit order",
+      "labels": ["stock-trading", "oracle", "order-management"],
+      "description": "Verify a user can cancel a pending limit order before it executes.\nSteps: 1) Log in with a funded trading account. 2) Place a Buy Limit order for 10 ORCL shares at 10% below market. 3) Open Open Orders and select the ORCL order. 4) Click Cancel Order and confirm.\nExpected: the order status changes to Cancelled, it disappears from Open Orders, and the reserved cash is released to the available balance."
+    }
+  ]
+}
