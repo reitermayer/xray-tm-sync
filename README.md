@@ -11,45 +11,31 @@ Every write is a dry run until you pass `--yes`.
 
 Every demo command needs `--xray-project` and `--tm-project`, and that pair must first be registered as a sandbox with `sandbox add`. The registry lives in `~/.config/xray-tm-demo/sandboxes.json`.
 
-## Status (17.10.2026)
+## Status
 
-The skills are split, tested and installed (41 tests pass). The demo ran live end to end; see [docs/REHEARSAL.md](docs/REHEARSAL.md).
+Both skills are tested (`uv run pytest`) and ran live end to end against Xray Cloud and UiPath Test Manager; see [docs/REHEARSAL.md](docs/REHEARSAL.md). Open items and wishes for `uip` are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 **Docs**
 - [docs/INSTALL.md](docs/INSTALL.md): setup for students and customers, each with their own Xray and TM accounts.
 - [docs/DEMO.md](docs/DEMO.md): the demo chapters, each with its prompt, commands and evidence.
 - [docs/REHEARSAL.md](docs/REHEARSAL.md): real numbers from the live run.
+- [docs/ROADMAP.md](docs/ROADMAP.md): open items.
 
-**Elsewhere**
-- **Slides:** `My Drive/UiPath/MVP 2026/Projects/xray-tm-sync/slides/`, with the deck artifact, the recording script and a draft `.pptx`.
-- **Chapter 3b target app:** [reitermayer/trade-demo](https://github.com/reitermayer/trade-demo). It is built and tested but not deployed; `./deploy.sh` there is ready for you to run.
-
-**Open**
-1. **Before going public:**
-   - add a LICENSE
-   - make this README neutral (remove the tenant, UIP/XCA and Drive specifics)
-   - rotate the Xray API key
-   - then change the repo visibility
-2. **Chapter 3b:**
-   - deploy trade-demo
-   - build the UiPath automations ([trade-demo/docs/AUTOMATION.md](https://github.com/reitermayer/trade-demo/blob/main/docs/AUTOMATION.md))
-   - link them to XCA:13–20
-3. **Wishes for UiPath:**
-   - `uip tm testcases create/update --foreign-reference`, with the field returned by `testcases list` (see [docs/REHEARSAL.md](docs/REHEARSAL.md))
-   - `uip tm executions delete`
-4. **Clean up XCA:** the CALC fixture leftovers (XCA:1–4, 6, 7) and the scratch TM project `XRSYNC`.
+**Related:** [reitermayer/trade-demo](https://github.com/reitermayer/trade-demo), the stock-trading web app used as the automation target in demo chapter 3b.
 
 ## Demo flow (target)
 
+In this section, `DEMO` is your sandbox Jira project and TM project.
+
 1. **Show Xray → sync → show TM.**
-   - Show the Xray tests and their descriptions in Jira project UIP.
+   - Show the Xray tests and their descriptions in Jira project DEMO.
    - Sync: `xray-tm-sync pull` → `plan` → `apply --yes` → `testsets --yes`.
-   - Show the TM test cases and the TM test set in XCA.
+   - Show the TM test cases and the TM test set in TM project DEMO.
 2. **Mock run → results to Xray.**
    - `xray-tm-demo execute --yes` (all Passed by default).
    - Show "Passed" in TM.
    - `xray-tm-demo report --yes`, then show the new `[MOCK]` Xray Test Execution in Jira.
-3. **Between rehearsals:** `xray-tm-demo reset --xray-project UIP --tm-project XCA --reseed --yes`.
+3. **Between rehearsals:** `xray-tm-demo reset --xray-project DEMO --tm-project DEMO --reseed --yes`.
 
 ## Design decisions
 
@@ -114,17 +100,17 @@ S=~/.claude/skills/xray-tm-sync/scripts/xray_tm_sync.py
 D=~/.claude/skills/xray-tm-demo/scripts/xray_tm_demo.py
 
 # production
-$S check    --tm-project XCA
-$S pull     --jql 'project = UIP AND issuetype = Test'
-$S plan     --tm-project XCA && $S apply --yes
-$S testsets --tm-project XCA --yes
-$S report   --tm-project XCA --execution-id <uuid> --yes          # real TM results only
+$S check    --tm-project DEMO
+$S pull     --jql 'project = DEMO AND issuetype = Test'
+$S plan     --tm-project DEMO && $S apply --yes
+$S testsets --tm-project DEMO --yes
+$S report   --tm-project DEMO --execution-id <uuid> --yes          # real TM results only
 
 # demo (sandbox pair registered once)
-$D sandbox add --xray-project UIP --tm-project XCA
-$D execute --xray-project UIP --tm-project XCA --tm-test-set XCA:6 --yes
-$D report  --xray-project UIP --tm-project XCA --execution-id <uuid> --yes
-$D reset   --xray-project UIP --tm-project XCA --reseed         # dry run; add --yes
+$D sandbox add --xray-project DEMO --tm-project DEMO
+$D execute --xray-project DEMO --tm-project DEMO --tm-test-set DEMO:21 --yes
+$D report  --xray-project DEMO --tm-project DEMO --execution-id <uuid> --yes
+$D reset   --xray-project DEMO --tm-project DEMO --reseed         # dry run; add --yes
 ```
 
 ## Develop

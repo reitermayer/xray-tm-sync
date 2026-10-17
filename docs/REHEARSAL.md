@@ -1,6 +1,6 @@
 # Live rehearsal: 17.10.2026
 
-This was a full run of [DEMO.md](DEMO.md) chapters 0–4 against **Jira project UIP** (Xray Cloud, global host) and **TM project XCA** (staging, tenant AgenticTesting). The skills ran from `~/.claude/skills`, as installed.
+This was a full run of [DEMO.md](DEMO.md) chapters 0–4 against **Jira project UIP** (Xray Cloud, global host) and **TM project XCA** (a UiPath Automation Cloud tenant). The skills ran from `~/.claude/skills`, as installed.
 
 Every number below comes from the command trail in `.xray-tm-sync/evidence/`, which is not committed because it contains tenant data.
 
