@@ -2,7 +2,7 @@
 
 ## Demo chapter 3b: real automation instead of the mock run
 
-- **Target app:** [reitermayer/trade-demo](https://github.com/reitermayer/trade-demo). Deploy it where the robot can reach it (`./deploy.sh` in that repo).
+- **Target app:** [reitermayer/trade-demo](https://github.com/reitermayer/trade-demo). Deployed at https://www.reitermayer.com/trade/ (`./deploy.sh` in that repo).
 - **Automations:** one per seeded Xray test, titled with the Xray test summary, so they pair with the TM test cases by name (see `trade-demo/docs/AUTOMATION.md`).
 - **Link:** `trade-demo/automation/link-automations.sh` links each TM test case to its automation, without AI.
 - **Run and report:** `uip tm testsets run --execution-type automated --wait`, then `xray_tm_sync.py report --yes`. This is the first production `report` of a real TM test execution.
