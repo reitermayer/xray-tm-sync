@@ -1190,7 +1190,8 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--execution-id", required=True, metavar="TM_EXECUTION_ID")
     c.add_argument("--xray-project", metavar="JIRA_PROJECT_KEY", help="Jira project of the new Xray test execution")
     c.add_argument("--xray-test-plan", metavar="XRAY_KEY")
-    c.add_argument("--test-environment", nargs="+", metavar="NAME", help="Xray test environments, e.g. staging")
+    c.add_argument("--test-environment", nargs="+", metavar="NAME",
+                   help="Xray test environments that already exist in the Jira project, e.g. staging")
     c.add_argument("--yes", action="store_true")
 
     sub.add_parser("status", help="summarize the last snapshot, plan and report")

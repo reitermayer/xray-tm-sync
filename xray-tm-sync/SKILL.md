@@ -1,137 +1,136 @@
 ---
-name: jre-xray-uipath
-description: Xray Cloud (Jira) ↔ UiPath Test Manager via Xray GraphQL and the `uip tm` CLI. Intake of Xray tests as TM test cases (steps, precondition text, XR_* labels, origin marker in TM custom fields, re-sync with drift protection); Xray test sets mirrored as TM test sets; mock (robot-free) manual TM executions from an outcomes file; TM execution results reported back to Xray as an Xray test execution (Xray JSON import, mock results only into a sandbox Jira project). Every TM or Xray write is a dry run until --yes. Use for "import/sync Xray tests into Test Manager", "create TM test sets from Xray", "mock-run the Xray test set in TM", "send TM results to Xray", "Xray to UiPath". Xray Server/Data Center is not supported. General Test Manager work→uipath-test.
+name: xray-tm-sync
+description: Sync Xray Cloud (Jira) tests into UiPath Test Manager with Xray GraphQL and the `uip tm` CLI. Intake of Xray tests as TM test cases (steps, precondition text, XR_* labels, origin marker in a TM custom field, re-sync with drift protection), Xray test sets mirrored as TM test sets, and results of real TM test executions sent back to Xray as an Xray test execution. Every write is a dry run until --yes, and every run leaves a command trail. Never deletes anything. Use for "retrieve the Xray tests from Jira project X and sync them to TM project Y", "import Xray tests into Test Manager", "create TM test sets from Xray", "send the TM results to Xray", "give me the commands to run this without you". Demo seeding, mock runs and resets→xray-tm-demo. General Test Manager work→uipath-test. Xray Server/Data Center is not supported.
 ---
 
-# Xray Cloud ↔ UiPath Test Manager
+# Xray Cloud → UiPath Test Manager (production sync)
 
 | Direction | Subcommands | Writes to |
 |---|---|---|
 | Xray → TM | `pull`, `plan`, `apply` (TM test cases); `testsets` (TM test sets) | TM |
-| TM only | `execute --mock` (manual TM test execution, robot-free, results from a file) | TM |
-| TM → Xray | `report` (Xray test execution with the results) | **Xray / Jira** |
-| Cleanup | `reset` (demo reset: deletes what the skill created) | TM and Xray |
+| TM → Xray | `report`, for real TM test executions only | **Xray / Jira** (new Xray test execution) |
+| Read only | `check`, `status` | — |
 
-Only `reset` deletes: objects the skill created (origin markers / report marker), and with `--reseed`
-everything Xray in a named sandbox Jira project, which is then re-seeded with demo Xray tests.
+**Nothing is ever deleted**, neither in TM nor in Xray.
 
-## Words — read this first
+## Words: read this first
 
-Xray and TM use the same words for different things. In everything you say or write, **never use these
-words bare**: test, case, step, set, key, id, project, folder, precondition, requirement, label, run,
-execution, type. Always say **Xray …** or **TM …**.
+Xray and TM use the same words for different things. In everything you say or write, **never use these words on their own**: test, case, step, set, key, id, project, folder, precondition, requirement, label, run, execution, type. Always say **Xray …** or **TM …**.
 
 - An **Xray test** (`CALC-123`, hyphen) becomes a **TM test case** (`CALC:12`, colon).
-- An **Xray test set** (`CALC-200`, a Jira issue) becomes a **TM test set** (`CALC:40`, executable).
+- An **Xray test set** (`CALC-200`, a Jira issue) becomes a **TM test set** (`CALC:40`, which can be executed).
 - An **Xray test execution** (`CALC-300`, a Jira issue) is created from a **TM test execution** (a UUID).
 - An **Xray repository folder** is *not* a TM folder. In TM, "folder" means an **Orchestrator folder**.
-- An **Xray precondition** is a separate reusable Jira issue; the **TM precondition** is a text field.
+- An **Xray precondition** is a separate, reusable Jira issue. The **TM precondition** is a text field.
 
-Full table: [references/terminology.md](references/terminology.md). Field rules:
-[references/field-mapping.md](references/field-mapping.md). Test sets, mock execution and results:
-[references/execution-and-results.md](references/execution-and-results.md). Xray API:
-[references/xray-graphql.md](references/xray-graphql.md).
+Further references:
+- Full word table: [references/terminology.md](references/terminology.md)
+- Field rules: [references/field-mapping.md](references/field-mapping.md)
+- TM test sets, results and the command trail: [references/test-sets-and-results.md](references/test-sets-and-results.md)
+- Xray API: [references/xray-graphql.md](references/xray-graphql.md)
+
+## Why this design: tell the user when it helps
+
+- **The agent picks the parameters; the script and `uip` do the work.** Xray test content goes from Xray to the script to `uip`; it never passes through you. Don't retype or rewrite Xray content yourself.
+- **The same commands run without an agent.** CI and cron can call the script with no AI tokens. When asked for "the commands", print the exact `$S …` lines you ran (with `--yes` where the user approved) and point to the trail files in `evidence`.
+- **Every write gets checked twice:** before, as a dry-run plan the user confirms, and after, with a read-back from TM and an idempotent re-run that shows `unchanged`.
 
 ## Auth
 
-- **TM:** the user's `uip login` session (browser OAuth; CI: `uip login --client-id … --client-secret …`).
-  The script only calls `uip tm … --output json`, with one documented exception: `uip tm` cannot delete
-  TM test executions, so `reset` calls the public TM API v2 `DELETE …/testexecutions/{id}` with the token
-  from `uip login refresh`. Never call TM REST for anything else.
-  If `uip` is logged out, ask the user to run `! uip login` — never run an interactive login yourself.
-- **Xray Cloud:** no OAuth exists. A Jira admin creates an API key (Jira → Apps → Xray → Settings → API
-  Keys). The user exports `XRAY_CLIENT_ID` and `XRAY_CLIENT_SECRET`, optionally `XRAY_REGION`
-  (`eu`, `us`, `au`; default global) and `XRAY_JIRA_BASE_URL` (e.g. `https://acme.atlassian.net`, for
-  links). The script trades them for a 24 h token held in memory only. Never echo, log or write the
-  secret. `report --yes` needs a key whose Jira user may create Xray test execution issues; intake only
-  needs read access.
+- **TM:** the user's `uip login` session: browser OAuth, or in CI `uip login --client-id env.X --client-secret env.Y -t <tenant>`.
+  - The script calls only `uip tm … --output json`, never TM REST.
+  - If `uip` is logged out, ask the user to run `! uip login --interactive`. Never run an interactive login yourself.
+- **Xray Cloud:** Xray has no OAuth. A Jira admin creates an API key under Jira → Apps → Xray → API Keys.
+  - The key goes in `~/.config/xray-tm-sync/xray.env` (mode 600; the script refuses the file if others can read it), or in the environment variables `XRAY_CLIENT_ID` / `XRAY_CLIENT_SECRET`. Environment variables override the file.
+  - Optional settings: `XRAY_REGION` (eu, us or au; the default is global) and `XRAY_JIRA_BASE_URL` (used for links).
+  - The script exchanges the key for a 24 h token that it keeps in memory only.
+  - **Never** ask the user to paste the secret into the chat, and never echo, log or write it.
+  - `report --yes` needs a key whose Jira user may create issues. Intake needs read access only.
+- **Origin marker field.** It defaults to `Xray Key`. Set `XRAY_ID_FIELD=XRAY_ID` to share markers with the Avalon Test Manager MCP server.
 
 ## Workflow
 
-`S=~/.claude/skills/jre-xray-uipath/scripts/xray_uipath.py` (uv inline script; needs `uv` and `uip`).
-All state is in `./.xray-uipath/` (override with `--workdir`). Every subcommand prints JSON.
+`S=~/.claude/skills/xray-tm-sync/scripts/xray_tm_sync.py`. It is a uv inline script, so it needs `uv` and `uip`.
+- State lives in `./.xray-tm-sync/`; `--workdir` overrides that.
+- Every subcommand prints JSON, including an `evidence` entry that names its trail files.
 
-### A. Intake: Xray tests → TM test cases
+### A. Xray tests → TM test cases
 
-1. **Check**: `$S check --tm-project <TM_PROJECT_KEY>`. Report every entry in `problems`. Ask for the
-   TM project key if missing; resolve names with `uip tm project list --filter <text> --output json`.
-   Never create a TM project unasked.
-2. **Pull**: `$S pull --jql '<JQL>'`. Ask for the Jira scope first (e.g.
-   `project = CALC AND issuetype = Test`). Re-syncs of large Jira projects: add `--since <ISO date>`.
-   Report the counts per Xray test type and every warning.
-3. **Plan** (no TM writes): `$S plan --tm-project <KEY>`. Show `summary` and `by_action`:
-   `create`, `update` (Xray changed, TM untouched → Xray wins; TM steps of Xray tests without Xray steps are
-   TM-owned, e.g. generated with GenAI in TM, and are never touched), `unchanged`, `drift` (TM test case edited
-   by hand → **skipped**), `conflict` (several TM test cases carry one Xray key → skipped), `unsupported`.
-   Also show `tm_fields_to_create` and `orphans_not_in_pull` (reported, never deleted).
-4. **Confirm** the plan with the user. For each drifted TM test case ask whether Xray may overwrite it;
-   if yes, re-run `plan` with `--accept-drift <XRAY_KEY> …`.
-5. **Apply**: `$S apply --yes` (optionally `--only <XRAY_KEY> …`). Plans older than one hour are refused;
-   re-plan rather than passing `--force`.
-6. **Report** `counts`, `skipped` and failed items. A failed item is safe to retry with the next
-   `plan` + `apply` (its origin marker is written first).
+1. **Check.** Run `$S check --tm-project <TM_PROJECT_KEY>` and report every entry in `problems`.
+   - Ask for the TM project key if it is missing. Resolve names with `uip tm project list --filter <text> --output json`.
+   - Never create a TM project unasked.
+2. **Pull.** Run `$S pull --jql '<JQL>'`.
+   - Ask for the Jira scope first, e.g. `project = CALC AND issuetype = Test`.
+   - For re-syncs of large Jira projects, add `--since <ISO date>`.
+   - Report the counts per Xray test type and every warning.
+3. **Plan** (no TM writes). Run `$S plan --tm-project <KEY>` and show `summary` and `by_action`:
+
+   | Action | Meaning |
+   |---|---|
+   | `create` | New TM test case. |
+   | `update` | Xray changed and TM is untouched, so Xray wins. TM steps of Xray tests without Xray steps are TM-owned (e.g. generated with GenAI in TM) and are never touched. |
+   | `unchanged` | Nothing to do. |
+   | `drift` | The TM test case was edited by hand. **Skipped.** |
+   | `conflict` | Several TM test cases carry the same Xray key. Skipped. |
+   | `unsupported` | Cannot be synced. |
+
+   Also show `tm_fields_to_create` and `orphans_not_in_pull`. Orphans are reported, never deleted.
+4. **Confirm** the plan with the user. For each drifted TM test case, ask whether Xray may overwrite it. If yes, re-run `plan` with `--accept-drift <XRAY_KEY> …`.
+5. **Apply.** Run `$S apply --yes`, optionally with `--only <XRAY_KEY> …`.
+   - Plans older than one hour are refused. Re-plan rather than passing `--force`.
+6. **Report** `counts`, `skipped` and any failed items.
+   - A failed item is safe to retry with the next `plan` + `apply`, because its origin marker is written first.
+   - Offer a re-run of `plan` as proof that everything is now `unchanged`.
 
 ### B. Xray test sets → TM test sets
 
-Run after A. `$S testsets --tm-project <KEY>` is a dry run: per Xray test set it shows `create` /
-`update` / `unchanged`, the TM case keys to `add` / `remove`, and `xray_tests_not_in_tm` (members outside
-the pulled JQL). Confirm, then `$S testsets --tm-project <KEY> --yes` (`--only <XRAY_TEST_SET_KEY> …`).
-Only Xray-origin members are removed; TM test cases a user added by hand stay.
+Run this after A.
+1. `$S testsets --tm-project <KEY>` is a dry run. Per Xray test set it shows:
+   - the action: `create`, `update` or `unchanged`
+   - the TM case keys to `add` and to `remove`
+   - `xray_tests_not_in_tm`: members outside the pulled JQL
+2. Confirm with the user, then run `$S testsets --tm-project <KEY> --yes`, optionally with `--only <XRAY_TEST_SET_KEY> …`.
 
-### C. Mock TM execution (pipe test, robot-free)
+Only Xray-origin members are removed; TM test cases added by hand stay.
 
-Only when the user asks for a mock or demo run.
-1. Write an outcomes file; default for every TM test case is Passed:
-   `{"CALC-101": {"result": "Failed", "failed_step": 2, "comment": "button missing"}, "CALC-102": "Passed"}`
-   (results: Passed, Failed, None, Restricted).
-2. `$S execute --tm-project <KEY> --tm-test-set <TM_TEST_SET_KEY> --mock --outcomes <file>` — dry run,
-   shows the planned outcome per TM test case. Confirm, then add `--yes`. It starts a manual TM test
-   execution and records the results; every TM step log is tagged `[MOCK]`. Note the `execution_id`.
+### C. TM results → Xray
 
-### D. TM results → Xray
+`$S report --tm-project <KEY> --execution-id <TM_EXECUTION_ID>` builds `xray-results-<id>.json` (dry run).
+- Optional: `[--xray-test-plan <XRAY_KEY>] [--test-environment <NAME> …] [--xray-project <JIRA_PROJECT_KEY>]`.
+- Show `by_status`, `skipped` and the target `xray_project`, and confirm the Jira project with the user.
+- Then add `--yes` and report the new Xray test execution key.
+- Mock results are refused. If the user wants a mock or demo run, that is the `xray-tm-demo` skill.
 
-`$S report --tm-project <KEY> --execution-id <TM_EXECUTION_ID> [--xray-test-plan <XRAY_KEY>]` builds
-`xray-results-<id>.json` (dry run). Show `by_status`, `skipped` and the target `xray_project`, then add
-`--yes` to import; report the new Xray test execution key.
-- **Mock results** (from `execute --mock`, or any `[MOCK]` TM step log) are refused unless
-  `--sandbox-project <JIRA_PROJECT_KEY>` is given **and** every Xray test belongs to that Jira project.
-  They are labelled `[MOCK]` and use the Xray test environment `TM-mock`. Never suggest a production Jira
-  project as sandbox; ask the user which Jira project is the sandbox.
-- Real TM executions (testers or robots in TM) need no sandbox flag; confirm the Jira project with the user.
+### D. Running without the agent
 
-### E. Reset (between demo runs)
+When the user asks for automation (CI, cron, "without you"), give them the exact lines. For example:
 
-`$S reset --tm-project <KEY> [--xray-project <JIRA_PROJECT_KEY>] [--scope all|tm|xray]` is a dry run
-listing, in deletion order:
-1. Xray test executions created by `report` (found by the description marker; only `[MOCK]` ones unless
-   `--include-real-results`),
-2. TM test executions of Xray-origin TM test sets (plus mock runs recorded locally),
-3. Xray-origin TM test sets,
-4. Xray-origin TM test cases.
-TM test cases without an origin marker and hand-made Xray test executions are never candidates.
-Show the list, get an explicit yes, then add `--yes`. `--xray-project` limits everything to objects
-from that Jira project. After a reset, `pull` → `plan` shows everything as `create` again.
+```bash
+S=~/.claude/skills/xray-tm-sync/scripts/xray_tm_sync.py
+$S pull --jql 'project = CALC AND issuetype = Test' && $S plan --tm-project CALC && $S apply --yes
+$S testsets --tm-project CALC --yes
+```
 
-**Demo reseed** — `$S reset --tm-project <KEY> --xray-project <SANDBOX> --reseed` additionally treats the
-Jira project as a demo sandbox: it deletes **every** Xray test, Xray test set and Xray test execution in
-it and creates the seed from `assets/seed-stock-trading.json` (8 Manual stock-trading Xray tests for
-UiPath/PATH, Oracle/ORCL, Amazon/AMZN, steps as text in the description, plus the Xray test set "Stock
-trading regression"). Seed first, delete second: if Jira rejects the seed, nothing in Xray is deleted.
-Only ever use it on a Jira project the user explicitly called a sandbox; always show the dry run first.
+Explain the safety. `apply` only writes what `plan` decided. Drifted TM test cases stay skipped unless they are named with `--accept-drift`. Exit code 1 means some items failed, and they are retried on the next run.
 
 ## Rules
 
-1. Every write is a dry run first; show it, get the user's confirmation, then re-run with `--yes`.
-2. Delete only through `reset`, and only after the user approved its dry-run list. Xray tests and Xray test
-   sets are deleted only by `reset --reseed` in a sandbox Jira project the user named. Never create or delete
-   TM projects unasked.
-3. Never send mock results outside a sandbox Jira project the user named. Never fabricate "real" results.
-4. Follow the uipath-test conventions: `--output json` on every direct `uip` call, check the uip login
-   first, stop and ask on any unexpected `uip` error; do not fall back to REST.
-5. Do not hand-edit `.xray-uipath/*.json` to steer results; use the flags.
-6. Exit codes: 0 ok, 1 finished with failed items, 2 stopped before doing anything (`error`/`problems`).
+1. Every write is a dry run first. Show it, get the user's confirmation, then re-run with `--yes`. A CI run the user set up counts as standing confirmation for that pipeline only.
+2. Never delete anything, never create or delete TM projects unasked, and never fabricate results.
+3. Follow the uipath-test conventions:
+   - `--output json` on every direct `uip` call.
+   - Check `uip login` first.
+   - Stop and ask on any unexpected `uip` error.
+   - Do not fall back to REST.
+4. Do not hand-edit `.xray-tm-sync/*.json` to steer results; use the flags.
+5. Exit codes: 0 ok; 1 finished with failed items; 2 stopped before doing anything (see `error` or `problems`).
 
 ## Not supported
 
-Requirements linking (Jira requirement → TM requirement), attachments, Xray test plans as TM objects,
-robot (automated) executions started by this skill, Xray Server/DC. Say so plainly; don't improvise.
+- Requirements linking (Jira requirement → TM requirement)
+- Attachments
+- Xray test plans as TM objects
+- Robot executions started by this skill
+- Xray Server/DC
+
+Say so plainly; don't improvise.

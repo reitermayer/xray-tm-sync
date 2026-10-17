@@ -7,7 +7,7 @@
 | Precondition | Xray preconditions | `[CALC-9] <summary>` + newline + definition, joined by blank lines. Only the first 10 are read; a warning names the rest |
 | Steps | Xray steps (Manual only) | action → description (`(no action)` if empty), data → clipboard data, expected result → expected result. Called Xray tests are inlined (`getExpandedTests`) |
 | Labels | Derived | `XR_Imported`, `XR_Type_<Manual\|Cucumber\|Generic>`, `XR_Folder_<repository path>` (not for `/`), `XR_Label_<jira label>`, `XR_Set_<xray test set key>`; spaces → `_` |
-| Custom field `Xray Key` (Text) | Xray key | Origin marker, written right after the TM test case is created |
+| Custom field `Xray Key` (Text) | Xray key | Origin marker, written right after the TM test case is created. Name overridable with `XRAY_ID_FIELD` (e.g. `XRAY_ID`, the field the Avalon MCP servers use) |
 | Custom field `Xray Intake` (Text) | JSON | `{"xrayKey","lastModified","xrayHash","tmHash","intakeAt"}`; written last |
 
 Cucumber and Generic Xray tests get no TM steps; their definition goes into the description.
@@ -34,9 +34,14 @@ because `uip tm testcases list` does not return it. Non-`XR_` labels are never a
 
 - `testcases create` accepts only name, description, version → precondition, steps, labels, custom
   fields are separate calls (about 7–9 `uip` calls per new TM test case).
-- TM seeds an empty value row for every custom field definition when a TM test case is created;
-  `customfield value create` on such a row returns Success **without writing**. The script therefore
-  uses `value update`, falls back to `create`, and reads the value back.
+- About 100 ms after a TM test case is created, TM **asynchronously** provisions an empty value row for
+  every custom field definition. A value written in that window is clobbered, and `customfield value
+  create` on an already provisioned row returns Success **without writing**. The script therefore uses
+  `value update` (falls back to `create`), waits `XRAY_TM_SETTLE_SECONDS` (0.3 s), reads the value back
+  and re-writes up to 3 times. Same root cause and fix as the Avalon Test Manager MCP server (3.4.1).
+- TM test cases also have a `foreignReference` field that the TM REST API returns in every test case
+  list and in execution results — the better join key. `uip tm` 1.203 can neither set nor read it, so the
+  custom field stays the marker until `uip` exposes it.
 - `customfield value list` returns nothing without `--object-id`; there is no project-wide lookup by
   value. The script reads markers per TM test case once and caches them in `index-<TM project>.json`.
 - `testcases update --pre-condition ""` clears the TM precondition.

@@ -82,7 +82,7 @@ Pick one path. 3a always works. 3b shows real automation.
 > Send the results of this TM test execution back to Xray.
 
 - **Under the hood:**
-  - After 3a: `xray_tm_demo.py report --yes`. This makes an Xray Test Execution `[MOCK] …` with test environment `TM-mock`.
+  - After 3a: `xray_tm_demo.py report --yes`. This makes an Xray Test Execution `[MOCK] …` (add `--test-environment TM-mock` if that Xray test environment exists).
   - After 3b: `xray_tm_sync.py report --yes`, the production path.
   - Both send Xray JSON to `POST /api/v2/import/execution`, matched by the `testKey` from the origin marker, never by name.
 - **Evidence:** in Jira, the new Xray Test Execution showing 8 × PASSED. Open one Xray test to show its execution history.

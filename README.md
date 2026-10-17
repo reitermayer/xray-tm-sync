@@ -11,47 +11,33 @@ Every write is a dry run until you pass `--yes`.
 
 Every demo command needs `--xray-project` and `--tm-project`, and that pair must first be registered as a sandbox with `sandbox add`. The registry lives in `~/.config/xray-tm-demo/sandboxes.json`.
 
-## ⚠ Work in progress — resume here
+## Status (17.10.2026)
 
-The split from the former single skill `jre-xray-uipath` into these two skills is **half done** (17.10.2026).
+The skills are split, tested and installed (41 tests pass). The demo ran live end to end; see [docs/REHEARSAL.md](docs/REHEARSAL.md).
 
-**Done**
-- **Folders:** `xray-tm-sync/` and `xray-tm-demo/` exist.
-- **`xray-tm-sync/scripts/xray_tm_sync.py`** (production core):
-  - Demo code removed.
-  - `report` split into `collect_tm_results`, `build_xray_json` and `publish_results`. Production `report` refuses mock executions.
-  - No TM REST calls remain.
-  - Names updated: workdir `.xray-tm-sync`, log folder `~/.claude/logs/xray-tm-sync`, marker `reported by xray-tm-sync`, env var `XRAY_TM_WORKERS`.
-- **`xray-tm-demo/scripts/xray_tm_demo.py`** (written, **not yet tested**):
-  - Loads the core from the sibling folder `../xray-tm-sync/scripts/xray_tm_sync.py`. Override the path with `XRAY_TM_SYNC_SCRIPT`.
-  - Commands `sandbox`, `seed`, `execute`, `report`, `reset --reseed`.
-  - Classes `DemoXray`, which adds Xray create/delete, and `DemoTm`, which adds TM deletes and the one TM REST call.
-- **Seed data:** `xray-tm-demo/assets/seed-stock-trading.json` holds 8 Manual Xray tests (UiPath/PATH, Oracle/ORCL, Amazon/AMZN) and the Xray test set "Stock trading regression".
+**Docs**
+- [docs/INSTALL.md](docs/INSTALL.md): setup for students and customers, each with their own Xray and TM accounts.
+- [docs/DEMO.md](docs/DEMO.md): the demo chapters, each with its prompt, commands and evidence.
+- [docs/REHEARSAL.md](docs/REHEARSAL.md): real numbers from the live run.
 
-**Next steps**
-1. **Split the tests.** `tests/test_xray_uipath.py` → `tests/test_sync.py` (intake, test sets, production report incl. the mock refusal) plus `tests/test_demo.py` (sandbox guard, execute, mock report, reset, reseed).
-   - Add a shared `tests/conftest.py` that loads the core as `xray_tm_sync`, then the demo.
-   - Demo tests register the sandbox through `XRAY_TM_DEMO_SANDBOXES=<tmp file>`.
-   - Rename the `--sandbox-project` flags in tests to `--xray-project`.
-   - Run `uv run pytest -q`; it had 30 passing tests before the split.
-2. **Rewrite SKILL.md files.** `xray-tm-sync/SKILL.md` drops demo content and the TM REST exception. A new `xray-tm-demo/SKILL.md` covers the sandbox registration, the demo runbook and reset/reseed.
-   - Move the demo half of `xray-tm-sync/references/execution-and-results.md` to `xray-tm-demo/references/`.
-3. **Update `pyproject.toml`.** Rename the dev project from `jre-xray-uipath-dev`.
-4. **Reinstall.**
-   - Remove `~/.claude/skills/jre-xray-uipath` and install `xray-tm-sync` and `xray-tm-demo`.
-   - On Drive, replace `jre-xray-uipath.zip` with two zips and update the README rows.
-5. **Migrate live TM data.** XCA's TM custom field descriptions still say "Written by jre-xray-uipath". This is harmless. The local workdir `.xray-uipath` is now `.xray-tm-sync`.
-6. **Live demo prep** (needs the user's go):
-   - Run `sandbox add --xray-project UIP --tm-project XCA`.
-   - Run a `reset --reseed` dry run, then `--yes`. This is the first real run of Xray `createTest`/`deleteTest`.
-   - Then run the full demo once.
-7. **Command trail.** Log every `uip` call and Xray request to `.xray-tm-sync/evidence/<timestamp>.jsonl` and write a replayable `commands.sh`, so a pipeline can rerun the same calls without the agent.
-8. **Student install guide.** Done as a draft in `docs/INSTALL.md`. Every student uses their own Xray and TM accounts.
-   - The demo outline is in `docs/DEMO.md`. Chapter 3b (real automation from UiPath Studio for Mac) is still open.
-   - Xray secrets now live in `~/.config/xray-tm-sync/xray.env` (mode 600); environment variables override them.
-9. **Manager deck for UiPath and LGT managers.** Shows the value added, built around a Camtasia screen recording of the demo.
-   - Slides go in `My Drive/UiPath/MVP 2026/Projects/xray-tm-sync/slides/`, in the style of the "WebMCP Adapter Demo" artifact.
-   - Write a recording script and shot list for the screen recording.
+**Elsewhere**
+- **Slides:** `My Drive/UiPath/MVP 2026/Projects/xray-tm-sync/slides/`, with the deck artifact, the recording script and a draft `.pptx`.
+- **Chapter 3b target app:** [reitermayer/trade-demo](https://github.com/reitermayer/trade-demo). It is built and tested but not deployed; `./deploy.sh` there is ready for you to run.
+
+**Open**
+1. **Before going public:**
+   - add a LICENSE
+   - make this README neutral (remove the tenant, UIP/XCA and Drive specifics)
+   - rotate the Xray API key
+   - then change the repo visibility
+2. **Chapter 3b:**
+   - deploy trade-demo
+   - build the UiPath automations ([trade-demo/docs/AUTOMATION.md](https://github.com/reitermayer/trade-demo/blob/main/docs/AUTOMATION.md))
+   - link them to XCA:13–20
+3. **Wishes for UiPath:**
+   - `uip tm testcases create/update --foreign-reference`, with the field returned by `testcases list` (see [docs/REHEARSAL.md](docs/REHEARSAL.md))
+   - `uip tm executions delete`
+4. **Clean up XCA:** the CALC fixture leftovers (XCA:1–4, 6, 7) and the scratch TM project `XRSYNC`.
 
 ## Demo flow (target)
 
@@ -77,43 +63,46 @@ The split from the former single skill `jre-xray-uipath` into these two skills i
 | Re-sync | Xray wins, but TM test cases edited by hand are reported as `drift` and skipped (`--accept-drift` overrides) | One-way sync that doesn't silently overwrite edits. |
 | TM-owned steps | An Xray test without Xray steps leaves its TM steps alone, and those steps are left out of the drift hash | Steps are generated from the description with GenAI in TM. |
 | Results to Xray | Xray JSON import using `testKey` from the origin marker, not JUnit | JUnit matches tests by name, so Xray would create duplicate Generic tests. |
-| Mock results | Only in the demo skill: tagged `[MOCK]`, test environment `TM-mock`, sandbox Jira project only | Fake results would distort Xray coverage in a real Jira project. |
+| Mock results | Only in the demo skill: tagged `[MOCK]` (optional test environment `TM-mock` if it exists in Xray), sandbox Jira project only | Fake results would distort Xray coverage in a real Jira project. |
 | Reseed | Seed first, delete second | If Jira rejects the new tests, nothing in Xray is deleted. |
 | Naming | Words like test, step, key or folder are never used without an Xray/TM qualifier ([terminology](xray-tm-sync/references/terminology.md)) | Xray and TM use the same words for different things. For example, an Xray repository folder is not an Orchestrator folder. |
 
 ## `uip tm` quirks found and handled (uip 1.203, 17.10.2026)
 
-- **Silent no-op on custom field values.** TM creates an empty value row for each custom field when a test case is created. `customfield value create` on such a row returns Success but writes nothing. The skill uses `update` instead and reads the value back. Worth reporting to UiPath.
+- **Custom field values can be lost right after creation.** About 100 ms after a TM test case is created, TM provisions empty custom field rows asynchronously. These can overwrite a value written in that window, and `customfield value create` on an existing row returns Success but writes nothing. The skill uses `update`, waits, reads the value back and writes it again if needed. The Avalon Test Manager MCP server 3.4.1 found the same race.
 - **No project-wide lookup of custom field values.** Markers are read one TM test case at a time and cached in a local index.
 - **Step logs need `testcaselog start` first.** Without it, `testcaselog finish --step-logs` fails with HTTP 400.
 - **Missing test case ids.** `testsets list-testcases` rows have no TM case id; the skill resolves them through `testcases list`.
 - **No way to delete executions in the CLI.** `uip tm` cannot delete TM test executions, and deleting a TM test set leaves its executions behind.
 - **Manual runs need no default folder.** `testsets run --execution-type manual` works without a robot or a default Orchestrator folder.
 
-## Verified live (17.10.2026, before the split)
+## Verified live (17.10.2026)
 
-- **Staging, tenant AgenticTesting, TM project `XCA`:** intake create, idempotent re-run, update, drift, test set mirroring, a mock execution, and a dry run of the Xray results report.
-- **Xray Cloud, global host, Jira project `UIP`:** authentication; `getExpandedTests` pulled all 5 Manual Xray tests; `apply` created TM test cases `XCA:8`–`XCA:12`; re-plan showed all 5 `unchanged`; `getTestExecutions`/`getTests` ran in reset dry runs.
-- **TM REST delete of a TM test execution:** worked live.
-- **Not yet run live:**
-  - `report --yes`, which writes to Jira.
-  - Xray `createTest`/`createTestSet`/`deleteTest`.
-  - Anything since the split.
-- **Leftovers:**
-  - In `XCA`: CALC fixture data (4 TM test cases, TM test sets `XCA:6`/`XCA:7`, one mock execution) and UIP test cases `XCA:8`–`XCA:12`.
-  - The scratch TM project `XRSYNC`.
+- **Before the split:** intake create, idempotent re-run, update, drift, test set mirroring, and the TM REST delete of a TM test execution.
+- **After the split, as installed:** the full demo, chapters 0–4:
+  - `reset --reseed` with the first live Xray `createTest`, `createTestSet` and `deleteTest`
+  - sync of 8 Xray tests
+  - TM test set mirroring
+  - the mock run
+  - the production `report` refusing the mock run
+  - the `[MOCK]` Xray test execution UIP-17
+
+  Details are in [docs/REHEARSAL.md](docs/REHEARSAL.md).
+- **Not yet run live:** a production `report --yes` of a *real* TM test execution. It shares its import code with the demo report, which did run.
 
 ## Layout
 
 ```
 xray-tm-sync/                       production skill
-  SKILL.md                          (still describes the pre-split skill — see next steps)
-  references/                       terminology, field mapping, execution & results, Xray GraphQL
+  SKILL.md
+  references/                       terminology, field mapping, test sets & results & evidence, Xray GraphQL
   scripts/xray_tm_sync.py           check | pull | plan | apply | testsets | report | status
 xray-tm-demo/                       demo skill (needs xray-tm-sync installed next to it)
+  SKILL.md
+  references/demo-operations.md     seed, mock run, mock report, reset
   assets/seed-stock-trading.json    8 demo Xray tests + 1 Xray test set
   scripts/xray_tm_demo.py           sandbox | seed | execute | report | reset
-docs/INSTALL.md, docs/DEMO.md          student install guide, demo chapters
+docs/                               INSTALL (students/customers), DEMO (chapters), REHEARSAL (live evidence)
 tests/                              pytest + fake `uip` (in-memory TM) + recorded GraphQL pages
 ```
 

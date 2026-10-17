@@ -91,7 +91,7 @@ def test_mock_report_goes_to_the_sandbox_as_mock(env, run_demo, tmp_path, capsys
     record = mock_execution(env, run_demo, tmp_path, capsys,
                             {"CALC-101": {"result": "Failed", "failed_step": 2}})
     assert run_demo("report", *PAIR, "--execution-id", record["execution_id"], "--xray-test-plan", "CALC-299",
-                    "--yes") == 0
+                    "--test-environment", "TM-mock", "--yes") == 0
     out = json.loads(capsys.readouterr().out)
     assert out["xray_test_execution"]["key"] == "CALC-300" and out["mock"] is True
     body = xray["imports"][0]

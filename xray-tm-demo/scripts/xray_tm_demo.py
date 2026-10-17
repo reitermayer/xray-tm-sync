@@ -44,7 +44,7 @@ core = load_core()
 IntakeError, Workspace, emit, log = core.IntakeError, core.Workspace, core.emit, core.log
 
 MOCK_TAG = core.MOCK_TAG
-MOCK_TEST_ENVIRONMENT = "TM-mock"
+MOCK_TEST_ENVIRONMENT = "TM-mock"  # suggested name; Xray only accepts test environments that exist in the project
 DEFAULT_SEED = Path(__file__).resolve().parent.parent / "assets" / "seed-stock-trading.json"
 TM_HTTP_TRANSPORT: Any = None  # tests inject an httpx transport for the one TM REST call
 
@@ -309,7 +309,7 @@ def cmd_report(args: argparse.Namespace) -> int:
     xray_json = core.build_xray_json(
         tm, args.execution_id, results["tests"], args.xray_project, label,
         summary_prefix=f"{MOCK_TAG} ", description_suffix=" Mock results — not real test outcomes.",
-        test_environments=[MOCK_TEST_ENVIRONMENT], xray_test_plan=args.xray_test_plan,
+        test_environments=args.test_environment, xray_test_plan=args.xray_test_plan,
     )
     emit(core.publish_results(ws, tm, args.execution_id, xray_json, results, args.yes, mock=True))
     return 0
@@ -462,6 +462,8 @@ def main(argv: list[str] | None = None) -> int:
     pair(c)
     c.add_argument("--execution-id", required=True, metavar="TM_EXECUTION_ID")
     c.add_argument("--xray-test-plan", metavar="XRAY_KEY")
+    c.add_argument("--test-environment", nargs="+", metavar="NAME",
+                   help=f"Xray test environments that exist in the sandbox Jira project, e.g. {MOCK_TEST_ENVIRONMENT}")
     c.add_argument("--yes", action="store_true")
 
     c = sub.add_parser("reset", help="demo reset; --reseed also replaces all Xray data in the sandbox (dry run without --yes)")

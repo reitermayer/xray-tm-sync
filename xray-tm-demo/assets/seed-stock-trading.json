@@ -1,7 +1,7 @@
 {
   "xray_test_set": {
     "summary": "Stock trading regression",
-    "description": "Core buy, sell and order-management scenarios for UiPath (PATH), Oracle (ORCL) and Amazon (AMZN). Demo data seeded by jre-xray-uipath."
+    "description": "Core buy, sell and order-management scenarios for UiPath (PATH), Oracle (ORCL) and Amazon (AMZN). Demo data seeded by xray-tm-demo."
   },
   "xray_tests": [
     {
