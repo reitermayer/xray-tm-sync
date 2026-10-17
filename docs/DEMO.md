@@ -74,7 +74,8 @@ Pick one path. 3a always works. 3b shows real automation.
   - Publish them to Orchestrator and link them to the TM test cases.
 - **Under the hood:** `uip tm testsets run` (automated). The robot executes the automations.
 - **Evidence:** a real TM test execution with robot logs.
-- **Status:** not yet built. Next to settle: the target app for the stock trades (a dummy web app?), the robot setup, and linking the automations to TM test cases.
+- **Target app:** [reitermayer/trade-demo](https://github.com/reitermayer/trade-demo), a fake stock-trading web app with a market simulator, hosted at `https://reitermayer.com/trade/`.
+- **Status:** planned, not yet built. Still to settle: the robot setup, and linking the automations to TM test cases.
 
 ## 4. TM → Xray: send the results back
 
