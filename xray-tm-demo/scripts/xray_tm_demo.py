@@ -471,6 +471,7 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--yes", action="store_true")
 
     args = p.parse_args(argv)
+    core.start_trail(Path(args.workdir), "xray_tm_demo.py", args.cmd, sys.argv[1:] if argv is None else argv)
     handler = {"sandbox": cmd_sandbox, "seed": cmd_seed, "execute": cmd_execute, "report": cmd_report,
                "reset": cmd_reset}[args.cmd]
     try:

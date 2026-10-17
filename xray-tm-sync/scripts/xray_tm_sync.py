@@ -24,7 +24,9 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
+import shlex
 import subprocess
 import sys
 import time
@@ -36,7 +38,9 @@ from typing import Any, Iterator
 
 # --------------------------------------------------------------------------- constants
 
-TM_FIELD_XRAY_KEY = "Xray Key"  # origin marker on the TM test case
+# Origin marker on the TM test case. XRAY_ID_FIELD is the same override the Avalon Test Manager MCP server
+# reads, so both can share one marker (e.g. XRAY_ID_FIELD=XRAY_ID).
+TM_FIELD_XRAY_KEY = os.environ.get("XRAY_ID_FIELD", "Xray Key")
 TM_FIELD_INTAKE = "Xray Intake"  # JSON: lastModified, xrayHash, tmHash
 LABEL_PREFIX = "XR_"
 TM_NAME_MAX = 250
@@ -48,6 +52,7 @@ TM_TO_XRAY_STATUS = {"Passed": "PASSED", "Failed": "FAILED", "None": "TODO", "Re
 JIRA_FIELDS = ["key", "summary", "description", "labels", "status", "updated"]
 WORKERS = int(os.environ.get("XRAY_TM_WORKERS", "4"))
 RETRIES = 3
+SETTLE_SECONDS = float(os.environ.get("XRAY_TM_SETTLE_SECONDS", "0.3"))  # TM custom field provisioning race
 REPORT_MARKER = "reported by xray-tm-sync"  # in the description of every Xray test execution `report` creates
 
 XRAY_STEP_FIELDS = "id action data result"
@@ -90,6 +95,51 @@ def log(msg: str) -> None:
 def local_timestamp() -> str:
     # User convention: timestamps come from this exact command.
     return subprocess.run(["date", "+%d.%m.%Y %H:%M"], capture_output=True, text=True).stdout.strip()
+
+
+# --------------------------------------------------------------------------- command trail
+# Every uip call and Xray request of a run goes to <workdir>/evidence/<run>.jsonl, and the uip calls also go
+# to <run>.sh. The trail is the evidence that the agent only ran ordinary, repeatable commands. It never holds
+# secrets: Xray requests are recorded by operation name and variables, without headers or tokens.
+
+_TRAIL: dict[str, Path] = {}
+
+
+def start_trail(workdir: Path, tool: str, subcommand: str, argv: list[str]) -> None:
+    folder = workdir / "evidence"
+    folder.mkdir(parents=True, exist_ok=True)
+    run = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{subcommand}"
+    n = 1
+    while (folder / f"{run}.jsonl").exists():
+        n += 1
+        run = f"{run.rsplit('~', 1)[0]}~{n}"
+    _TRAIL["jsonl"], _TRAIL["sh"] = folder / f"{run}.jsonl", folder / f"{run}.sh"
+    rerun = shlex.join([tool, *argv])
+    _TRAIL["sh"].write_text(
+        "#!/bin/sh\n"
+        f"# uip calls made by: {rerun}  ({local_timestamp()})\n"
+        "# This is an audit record. To repeat the run, call the line above again: it is idempotent and\n"
+        "# plans before it writes, whereas replaying these lines blindly would create duplicates.\n"
+    )
+    trail({"tool": tool, "argv": argv, "time": local_timestamp()})
+
+
+def trail(entry: dict) -> None:
+    if "jsonl" not in _TRAIL:
+        return
+    with _TRAIL["jsonl"].open("a") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def trail_uip(cmd: list[str], ok: bool, ms: int) -> None:
+    trail({"tool": "uip", "argv": cmd[1:], "ok": ok, "ms": ms})
+    if "sh" in _TRAIL:
+        with _TRAIL["sh"].open("a") as f:
+            f.write(("" if ok else "# failed: ") + shlex.join(["uip", *cmd[1:]]) + "\n")
+
+
+def trail_paths() -> dict[str, str]:
+    return {k: str(v) for k, v in _TRAIL.items()}
 
 
 def short_hash(obj: Any) -> str:
@@ -179,6 +229,9 @@ class XrayClient:
             if r.status_code == 401 and attempt == 1:
                 self.authenticate()
                 continue
+            op = re.search(r"\b([a-z]\w*)\s*\(", query.split("{", 1)[-1])
+            trail({"tool": "xray", "graphql": op.group(1) if op else "?", "variables": variables,
+                   "http": r.status_code})
             if r.status_code != 200:
                 raise IntakeError(f"Xray GraphQL HTTP {r.status_code}: {r.text[:300]}")
             body = r.json()
@@ -200,6 +253,8 @@ class XrayClient:
             if r.status_code == 401 and attempt == 1:
                 self.authenticate()
                 continue
+            trail({"tool": "xray", "rest": "POST /api/v2/import/execution",
+                   "xray_tests": [t.get("testKey") for t in xray_json.get("tests", [])], "http": r.status_code})
             if r.status_code != 200:
                 raise IntakeError(f"Xray results import HTTP {r.status_code}: {r.text[:500]}")
             return r.json()
@@ -413,9 +468,12 @@ class TmCli:
         last: UipError | None = None
         for attempt in range(1, RETRIES + 1):
             self.calls += 1
+            started = time.monotonic()
             proc = subprocess.run(cmd, capture_output=True, text=True)
             env = _parse_envelope(proc.stdout) or _parse_envelope(proc.stderr)
-            if env and env.get("Result") == "Success":
+            ok = bool(env and env.get("Result") == "Success")
+            trail_uip(cmd, ok, int((time.monotonic() - started) * 1000))
+            if ok:
                 return env.get("Data")
             last = UipError(list(args), env or (proc.stderr or proc.stdout).strip()[:300])
             if not last.retryable:
@@ -505,18 +563,27 @@ class TmCli:
     def set_text_value(self, object_id: str, name: str, value: str, object_type: str = "TestCase") -> None:
         """Write a Text custom field value and verify it.
 
-        TM seeds an empty value row for every definition when a TM test case is created, and
-        `value create` on an existing row returns Success without writing. So: update first,
-        create only when no row exists, then read back.
+        Right after a TM test case is created, TM asynchronously provisions an empty value row for every
+        custom field definition (~100 ms later), which clobbers a value written in that window; a
+        `value create` on an already provisioned row returns Success without writing. So: update first,
+        create only when no row exists, wait, read back, and rewrite up to RETRIES times.
+        (Same root cause and fix as the Avalon Test Manager MCP server, 3.4.1.)
         """
         target = ["--object-type", object_type, "--name", name, "--object-id", object_id]
-        try:
-            self.tm("customfield", "value", "update", *target, "--data-type", "Text", "--value", value)
-        except UipError:
-            self.tm("customfield", "value", "create", *target, "--data-type", "Text", "--value", value)
-        stored = (self.tm("customfield", "value", "get", *target) or {}).get("Value")
-        if stored != value:
-            raise IntakeError(f"TM custom field {name!r} on {object_id} did not persist (read back {stored!r})")
+        stored = None
+        for _ in range(RETRIES):
+            try:
+                self.tm("customfield", "value", "update", *target, "--data-type", "Text", "--value", value)
+            except UipError:
+                self.tm("customfield", "value", "create", *target, "--data-type", "Text", "--value", value)
+            time.sleep(SETTLE_SECONDS)
+            try:
+                stored = (self.tm("customfield", "value", "get", *target) or {}).get("Value")
+            except UipError:
+                stored = None
+            if stored == value:
+                return
+        raise IntakeError(f"TM custom field {name!r} on {object_id} did not persist (read back {stored!r})")
 
 
 # --------------------------------------------------------------------------- workspace
@@ -548,6 +615,8 @@ def history_log(entry: dict) -> None:
 
 
 def emit(data: Any) -> None:
+    if isinstance(data, dict) and _TRAIL:
+        data = data | {"evidence": trail_paths()}
     print(json.dumps(data, indent=2, ensure_ascii=False))
 
 
@@ -1127,6 +1196,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("status", help="summarize the last snapshot, plan and report")
 
     args = p.parse_args(argv)
+    start_trail(Path(args.workdir), "xray_tm_sync.py", args.cmd, sys.argv[1:] if argv is None else argv)
     handler = {"check": cmd_check, "pull": cmd_pull, "plan": cmd_plan, "apply": cmd_apply, "testsets": cmd_testsets,
                "report": cmd_report, "status": cmd_status}[args.cmd]
     try:

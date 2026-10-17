@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Minimal stand-in for `uip tm …` used by the tests. State lives in $FAKE_UIP_STATE (JSON).
 
-Only the commands xray_uipath.py calls are implemented; anything else fails loudly.
+Only the commands xray_tm_sync.py and xray_tm_demo.py call are implemented; anything else fails loudly.
 Every call is appended to state["calls"] so tests can assert on the CLI traffic.
 """
 import json
@@ -138,6 +138,10 @@ def main():
         if f"{o['--object-type']}:{o['--name']}" not in st["fields"]:
             out(None, ok=False, msg="no such custom field definition")
         rows = st["values"].setdefault(o["--object-id"], {})
+        if st.get("clobber_writes"):  # like real TM right after creation: the empty row provisioning wins
+            st["clobber_writes"] -= 1
+            save()
+            out(rows.get(o["--name"]))
         if cmd.endswith("create") and o["--name"] in rows:
             out(rows[o["--name"]])  # like real TM: Success, but nothing is written
         if cmd.endswith("update") and o["--name"] not in rows:
