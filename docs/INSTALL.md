@@ -104,10 +104,11 @@ One codebase serves both ways of working: the `xr` command for people and script
 uv tool install git+https://github.com/reitermayer/xray-tm-sync    # puts `xr` on your PATH
 xr --version
 
-git clone https://github.com/reitermayer/xray-tm-sync.git
-mkdir -p ~/.claude/skills
-cp -R xray-tm-sync/xray xray-tm-sync/xray-tm-sync xray-tm-sync/xray-tm-demo ~/.claude/skills/   # demo is optional
+# the skills, for the coding agent you use (the same installer as UiPath's own skills):
+uip skills install --repo reitermayer/xray-tm-sync --agent claude
 ```
+
+`--agent` takes any coding agent `uip skills` supports: `claude`, `cursor`, `copilot`, `codex`, `opencode`, `autopilot`, `kiro`, `windsurf`, `antigravity`, `devin`. Add `--local` to install into the current project only. Without `uip`: copy the folders under `skills/` into your agent's skills folder (for Claude Code `~/.claude/skills/`).
 
 | Skill | Teaches the agent |
 |---|---|
@@ -203,7 +204,7 @@ xr demo reset --xray-project DEMO --tm-project DEMO --reseed --yes    # 8 stock-
 ```bash
 xr logout                                                # removes the Xray secret
 uv tool uninstall xr
-rm -rf ~/.claude/skills/xray ~/.claude/skills/xray-tm-sync ~/.claude/skills/xray-tm-demo
+uip skills uninstall --repo reitermayer/xray-tm-sync --agent claude   # only these skills, not UiPath's
 rm -rf ~/.config/xray-tm-sync ~/.config/xray-tm-demo
 uip logout
 ```

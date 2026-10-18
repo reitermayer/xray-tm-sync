@@ -24,7 +24,7 @@ Both print the envelope `{Result, Code, Data}`, take `--output json|table` and `
 | `xr sync check \| pull \| plan \| apply \| testsets \| report \| status` | **Production sync** Xray → TM, results TM → Xray. Never deletes TM test cases, TM test sets or anything in Xray. | **`xray-tm-sync`** |
 | `xr demo sandbox \| seed \| execute \| report \| reset` | **UiPath MVP demo**: seed, mock run, mock report, reset. Only in a registered sandbox pair (`~/.config/xray-tm-demo/sandboxes.json`). | **`xray-tm-demo`** |
 
-Install: [docs/INSTALL.md](docs/INSTALL.md) (`uv tool install git+https://github.com/reitermayer/xray-tm-sync`, then copy the three skill folders to `~/.claude/skills/`).
+Install: [docs/INSTALL.md](docs/INSTALL.md): `uv tool install git+https://github.com/reitermayer/xray-tm-sync`, then `uip skills install --repo reitermayer/xray-tm-sync --agent <agent>` for any coding agent `uip skills` supports (claude, cursor, copilot, codex, opencode, autopilot, kiro, windsurf, antigravity, devin).
 
 ## Status
 
@@ -69,7 +69,7 @@ In this section, `DEMO` is your sandbox Jira project and TM project.
 | Results to Xray | Xray JSON import using `testKey` from the origin marker, not JUnit | JUnit matches tests by name, so Xray would create duplicate Generic tests. |
 | Mock results | Only in the demo skill: tagged `[MOCK]` (optional test environment `TM-mock` if it exists in Xray), sandbox Jira project only | Fake results would distort Xray coverage in a real Jira project. |
 | Reseed | Seed first, delete second | If Jira rejects the new tests, nothing in Xray is deleted. |
-| Naming | Words like test, step, key or folder are never used without an Xray/TM qualifier ([terminology](xray-tm-sync/references/terminology.md)) | Xray and TM use the same words for different things. For example, an Xray repository folder is not an Orchestrator folder. |
+| Naming | Words like test, step, key or folder are never used without an Xray/TM qualifier ([terminology](skills/xray-tm-sync/references/terminology.md)) | Xray and TM use the same words for different things. For example, an Xray repository folder is not an Orchestrator folder. |
 
 ## `uip tm` quirks found and handled (uip 1.203, 17.10.2026)
 
@@ -104,9 +104,10 @@ src/xr/                             the only code
   sync.py                           xr sync: check | pull | plan | apply | testsets | report | status
   demo.py                           xr demo: sandbox | seed | execute | report | reset
   data/seed-stock-trading.json      8 demo Xray tests + 1 Xray test set
-xray/SKILL.md                       skill: xr object commands
-xray-tm-sync/                       skill: xr sync (SKILL.md + references: terminology, field mapping, results, GraphQL)
-xray-tm-demo/                       skill: xr demo (SKILL.md + references/demo-operations.md)
+skills/                             installed with `uip skills install --repo …` for any supported coding agent
+  xray/SKILL.md                     xr object commands
+  xray-tm-sync/                     xr sync (SKILL.md + references: terminology, field mapping, results, GraphQL)
+  xray-tm-demo/                     xr demo (SKILL.md + references/demo-operations.md)
 docs/                               INSTALL, DEMO (chapters), REHEARSAL (live evidence), ROADMAP
 tests/                              pytest + fake `uip` (in-memory TM) + fake Xray + recorded GraphQL pages
 ```
