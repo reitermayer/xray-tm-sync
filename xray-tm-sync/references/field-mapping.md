@@ -36,14 +36,14 @@ because `uip tm testcases list` does not return it. Non-`XR_` labels are never a
   fields are separate calls (about 7–9 `uip` calls per new TM test case).
 - About 100 ms after a TM test case is created, TM **asynchronously** provisions an empty value row for
   every custom field definition. A value written in that window is clobbered, and `customfield value
-  create` on an already provisioned row returns Success **without writing**. The script therefore uses
+  create` on an already provisioned row returns Success **without writing**. `xr sync` therefore uses
   `value update` (falls back to `create`), waits `XRAY_TM_SETTLE_SECONDS` (0.3 s), reads the value back
   and re-writes up to 3 times. Same root cause and fix as the Avalon Test Manager MCP server (3.4.1).
 - TM test cases also have a `foreignReference` field that the TM REST API returns in every test case
   list and in execution results — the better join key. `uip tm` 1.203 can neither set nor read it, so the
   custom field stays the marker until `uip` exposes it.
 - `customfield value list` returns nothing without `--object-id`; there is no project-wide lookup by
-  value. The script reads markers per TM test case once and caches them in `index-<TM project>.json`.
+  value. `xr sync` reads markers per TM test case once and caches them in `index-<TM project>.json`.
 - `testcases update --pre-condition ""` clears the TM precondition.
 - Labels may contain `/`, `-` and non-ASCII characters.
 - TM adds its own system label `manual` to new TM test cases; it is left alone.

@@ -24,7 +24,7 @@ Setup is described in [INSTALL.md](INSTALL.md). In this document, `DEMO` stands 
 
 > Reset the demo sandbox DEMO and seed the stock-trading tests.
 
-- **Under the hood:** `xray_tm_demo.py reset --xray-project DEMO --tm-project DEMO --reseed`, which is a dry run, then the same command with `--yes`.
+- **Under the hood:** `xr demo reset --xray-project DEMO --tm-project DEMO --reseed`, which is a dry run, then the same command with `--yes`.
 - **Evidence:** the dry-run list of what would be deleted. Nothing is deleted until you confirm.
 - Off camera. Run it between rehearsals.
 
@@ -32,8 +32,9 @@ Setup is described in [INSTALL.md](INSTALL.md). In this document, `DEMO` stands 
 
 > Show me the Xray tests in Jira project DEMO.
 
-- **Under the hood:** `xray_tm_demo.py seed` and Xray GraphQL `createTest`/`createTestSet`. The seed creates 8 Manual Xray tests (buy, sell, limit and stop-loss orders for UiPath, Oracle and Amazon) and the Xray test set "Stock trading regression".
+- **Under the hood:** `xr demo seed` (or `xr tests list` to show what is there) and Xray GraphQL `createTest`/`createTestSet`. The seed creates 8 Manual Xray tests (buy, sell, limit and stop-loss orders for UiPath, Oracle and Amazon) and the Xray test set "Stock trading regression".
 - **Evidence:** open Jira. Show an Xray test with its description; the description is the spec. Show the Xray test set.
+  - In a terminal, the same data without the agent: `xr tests list --project DEMO --output table`, then `uip tm project list --output table` next to it. Same style, two products.
 - **Message:** this is where testers already work today, and nothing changes for them.
 
 ## 2. Xray → TM: sync Xray tests into TM test cases
@@ -41,8 +42,8 @@ Setup is described in [INSTALL.md](INSTALL.md). In this document, `DEMO` stands 
 > Retrieve all Xray tests from Jira project DEMO and sync them to TM project DEMO. Show me the plan first.
 
 - **Under the hood:**
-  - `xray_tm_sync.py pull`: Xray GraphQL `getExpandedTests`.
-  - `xray_tm_sync.py plan`: a dry run. The table shows 8 × `create`.
+  - `xr sync pull`: Xray GraphQL `getExpandedTests`.
+  - `xr sync plan`: a dry run. The table shows 8 × `create`.
   - After you answer **yes**: `apply --yes`, which calls `uip tm testcases create`, `uip tm customfield value update` and `uip tm objectlabel add`.
   - `testsets --yes`, which calls `uip tm testsets create` and `uip tm testcases add`.
 - **Evidence:**
@@ -60,7 +61,7 @@ Pick one path. 3a always works. 3b shows real automation.
 > Run the TM test set "Stock trading regression" as a mock run, all passed.
 
 - **Under the hood:**
-  - `xray_tm_demo.py execute --tm-test-set DEMO:… --yes`, which calls `uip tm testsets run --execution-type manual`.
+  - `xr demo execute --tm-test-set DEMO:… --yes`, which calls `uip tm testsets run --execution-type manual`.
   - For each TM test case: `uip tm testcaselog start`, then `uip tm testcaselog finish --result Passed`.
 - **Evidence:** the TM test execution with 8 × **Passed**.
 - **Honesty:** the results are tagged `[MOCK]`. The production `report` refuses to send them to Xray.
@@ -82,16 +83,17 @@ Pick one path. 3a always works. 3b shows real automation.
 > Send the results of this TM test execution back to Xray.
 
 - **Under the hood:**
-  - After 3a: `xray_tm_demo.py report --yes`. This makes an Xray Test Execution `[MOCK] …` (add `--test-environment TM-mock` if that Xray test environment exists).
-  - After 3b: `xray_tm_sync.py report --yes`, the production path.
+  - After 3a: `xr demo report --yes`. This makes an Xray Test Execution `[MOCK] …` (add `--test-environment TM-mock` if that Xray test environment exists).
+  - After 3b: `xr sync report --yes`, the production path.
   - Both send Xray JSON to `POST /api/v2/import/execution`, matched by the `testKey` from the origin marker, never by name.
 - **Evidence:** in Jira, the new Xray Test Execution showing 8 × PASSED. Open one Xray test to show its execution history.
+  - In a terminal: `xr testexecutions get <XRAY_KEY> --output table`.
 - **Message:** the round trip is closed. Xray stays the system of record, and TM runs the tests.
 
 ## 5. Wrap-up: run it again, then run it without the agent
 
 > Run the sync again. Then give me the commands so our pipeline can run this nightly without you.
 
-- **Under the hood:** `plan` reports 8 × `unchanged`, which proves the sync is idempotent. Claude then prints the plain `xray_tm_sync.py` / `uip` commands.
+- **Under the hood:** `plan` reports 8 × `unchanged`, which proves the sync is idempotent. Claude then prints the plain `xr` / `uip` commands.
 - **Evidence:** paste the commands into a fresh terminal and run them. Same result, no AI tokens.
 - **Message:** an agent where it adds value, a script where repeatability matters. MCP is for questions, the CLI for operations.

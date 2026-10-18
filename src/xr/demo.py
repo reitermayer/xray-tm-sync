@@ -1,21 +1,15 @@
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["httpx>=0.27"]
-# ///
-"""xray-tm-demo: demo tooling on top of xray-tm-sync (Xray Cloud ↔ UiPath Test Manager).
+"""xr demo: demo tooling on top of xr sync (Xray Cloud ↔ UiPath Test Manager).
 
 Not for production data. Every command needs --xray-project and --tm-project, and the pair must be
 registered as a sandbox first (`sandbox add`). Adds what a demo needs and production must never do:
 seed demo Xray tests, mock (robot-free) TM test executions, report mock results, and reset/reseed.
 
 Subcommands: sandbox | seed | execute | report | reset
-The intake itself (pull, plan, apply, testsets) is xray-tm-sync's job.
+The intake itself (pull, plan, apply, testsets) is `xr sync`'s job.
 """
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import os
 import sys
@@ -23,29 +17,12 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-SKILLS_DIR = Path(__file__).resolve().parents[2]
-
-
-def load_core():
-    """Import xray-tm-sync's script as a module (installed next to this skill)."""
-    if "xray_tm_sync" in sys.modules:
-        return sys.modules["xray_tm_sync"]
-    path = Path(os.environ.get("XRAY_TM_SYNC_SCRIPT", SKILLS_DIR / "xray-tm-sync" / "scripts" / "xray_tm_sync.py"))
-    if not path.exists():
-        sys.exit(json.dumps({"error": f"xray-tm-sync not found at {path}; install it next to xray-tm-demo."}))
-    spec = importlib.util.spec_from_file_location("xray_tm_sync", path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["xray_tm_sync"] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-core = load_core()
+from xr import sync as core
 IntakeError, Workspace, emit, log = core.IntakeError, core.Workspace, core.emit, core.log
 
 MOCK_TAG = core.MOCK_TAG
 MOCK_TEST_ENVIRONMENT = "TM-mock"  # suggested name; Xray only accepts test environments that exist in the project
-DEFAULT_SEED = Path(__file__).resolve().parent.parent / "assets" / "seed-stock-trading.json"
+DEFAULT_SEED = Path(__file__).resolve().parent / "data" / "seed-stock-trading.json"
 TM_HTTP_TRANSPORT: Any = None  # tests inject an httpx transport for the one TM REST call
 
 
@@ -67,48 +44,7 @@ def require_sandbox(args: argparse.Namespace) -> None:
 
 
 class DemoXray(core.XrayClient):
-    """Xray writes a demo needs: create and delete Xray tests, test sets, test executions."""
-
-    def iter_issues(self, getter: str, jql: str):
-        query = f"""
-query($jql: String, $limit: Int!, $start: Int) {{
-  page: {getter}(jql: $jql, limit: $limit, start: $start) {{
-    total start limit
-    results {{ issueId jira(fields: ["key", "summary", "description"]) }}
-  }}
-}}"""
-        start = 0
-        while True:
-            page = self.graphql(query, {"jql": jql, "limit": core.XRAY_PAGE, "start": start})["page"]
-            results = page.get("results") or []
-            yield from results
-            start += len(results)
-            if not results or start >= (page.get("total") or 0):
-                return
-
-    def delete(self, mutation: str, xray_issue_id: str) -> None:
-        self.graphql(f"mutation($id: String!) {{ {mutation}(issueId: $id) }}", {"id": xray_issue_id})
-
-    def create_test(self, jira_project: str, summary: str, description: str, labels: list[str]) -> dict:
-        """Manual Xray test without Xray steps (the steps live in the description)."""
-        data = self.graphql(
-            """mutation($jira: JSON!) {
-  createTest(testType: { name: "Manual" }, jira: $jira) { test { issueId jira(fields: ["key"]) } warnings }
-}""",
-            {"jira": {"fields": {"project": {"key": jira_project}, "summary": summary,
-                                 "description": description, "labels": labels}}},
-        )["createTest"]
-        return {"xray_issue_id": data["test"]["issueId"], "xray_key": data["test"]["jira"]["key"]}
-
-    def create_test_set(self, jira_project: str, summary: str, description: str, xray_issue_ids: list[str]) -> dict:
-        data = self.graphql(
-            """mutation($jira: JSON!, $ids: [String]) {
-  createTestSet(testIssueIds: $ids, jira: $jira) { testSet { issueId jira(fields: ["key"]) } warnings }
-}""",
-            {"jira": {"fields": {"project": {"key": jira_project}, "summary": summary, "description": description}},
-             "ids": xray_issue_ids},
-        )["createTestSet"]
-        return {"xray_issue_id": data["testSet"]["issueId"], "xray_key": data["testSet"]["jira"]["key"]}
+    """The Xray client the demo uses. The create and delete calls live in xr sync's XrayClient, shared with `xr tests`."""
 
 
 class DemoTm(core.TmCli):
@@ -435,7 +371,7 @@ def cmd_reset(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="xray_tm_demo", description=__doc__.split("\n\n")[0])
+    p = argparse.ArgumentParser(prog="xr demo", description=__doc__.split("\n\n")[0])
     p.add_argument("--workdir", default=".xray-tm-sync", help="state folder shared with xray-tm-sync")
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -473,7 +409,7 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--yes", action="store_true")
 
     args = p.parse_args(argv)
-    core.start_trail(Path(args.workdir), "xray_tm_demo.py", args.cmd, sys.argv[1:] if argv is None else argv)
+    core.start_trail(Path(args.workdir), "xr demo", args.cmd, sys.argv[1:] if argv is None else argv)
     handler = {"sandbox": cmd_sandbox, "seed": cmd_seed, "execute": cmd_execute, "report": cmd_report,
                "reset": cmd_reset}[args.cmd]
     try:

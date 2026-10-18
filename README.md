@@ -1,19 +1,34 @@
-# xray-tm-sync + xray-tm-demo
+# xr: Xray Cloud CLI + Xray ⇄ UiPath Test Manager sync
 
-Two Claude Code skills for the UiPath coding agent that connect **Xray Cloud** (Jira) to **UiPath Test Manager** (TM).
+**One codebase, two ways to use it.** `xr` is a command line tool for Xray Cloud built like UiPath's `uip`. People and CI pipelines run it directly; a coding agent (Claude Code) runs exactly the same commands through three skills that contain instructions only, no code. Whatever the agent did, a sceptic can re-run by hand, with the same output and the same command trail.
 
-| Skill | Purpose | Commands |
+```
+person / script / CI ──────────────┐
+                                    ├──▶  xr  ──▶ Xray Cloud (GraphQL, results import)
+coding agent ─▶ skills (SKILL.md) ──┘     │
+                                          └──▶ uip tm ──▶ UiPath Test Manager
+```
+
+| `uip` (Test Manager) | `xr` (Xray) |
+|---|---|
+| `uip tm project list` | `xr project list` |
+| `uip tm testcases list --project-key XCA` | `xr tests list --project UIP` |
+| `uip tm testsets list --project-key XCA` | `xr testsets list --project UIP` |
+| `uip tm executions list …` | `xr testexecutions list --project UIP` |
+
+Both print the envelope `{Result, Code, Data}`, take `--output json|table` and `--output-filter <JMESPath>`, and use the same exit codes. Every write is a dry run until `--yes`. (`uip xr …` itself is not possible: `uip` loads only tools from a fixed list of UiPath packages; see [docs/ROADMAP.md](docs/ROADMAP.md).)
+
+| Command group | Purpose | Skill |
 |---|---|---|
-| **`xray-tm-sync`** | **Production sync**, ready to hand to UiPath customers. Never deletes TM test cases, TM test sets or anything in Xray. | `check`, `pull`, `plan`, `apply`, `testsets`, `report` (real TM results only), `status` |
-| **`xray-tm-demo`** | **UiPath MVP demo.** Loads `xray-tm-sync` as a library and adds what production must never do. | `sandbox`, `seed`, `execute` (mock run), `report` (mock results), `reset [--reseed]` |
+| `xr login`, `project`, `tests`, `testsets`, `testexecutions`, `testplans` | Xray objects, one command each | **`xray`** |
+| `xr sync check \| pull \| plan \| apply \| testsets \| report \| status` | **Production sync** Xray → TM, results TM → Xray. Never deletes TM test cases, TM test sets or anything in Xray. | **`xray-tm-sync`** |
+| `xr demo sandbox \| seed \| execute \| report \| reset` | **UiPath MVP demo**: seed, mock run, mock report, reset. Only in a registered sandbox pair (`~/.config/xray-tm-demo/sandboxes.json`). | **`xray-tm-demo`** |
 
-Every write is a dry run until you pass `--yes`.
-
-Every demo command needs `--xray-project` and `--tm-project`, and that pair must first be registered as a sandbox with `sandbox add`. The registry lives in `~/.config/xray-tm-demo/sandboxes.json`.
+Install: [docs/INSTALL.md](docs/INSTALL.md) (`uv tool install git+https://github.com/reitermayer/xray-tm-sync`, then copy the three skill folders to `~/.claude/skills/`).
 
 ## Status
 
-Both skills are tested (`uv run pytest`) and ran live end to end against Xray Cloud and UiPath Test Manager; see [docs/REHEARSAL.md](docs/REHEARSAL.md). Open items and wishes for `uip` are in [docs/ROADMAP.md](docs/ROADMAP.md).
+`xr` and the skills are tested (`uv run pytest`) and ran live end to end against Xray Cloud and UiPath Test Manager; see [docs/REHEARSAL.md](docs/REHEARSAL.md). Open items and wishes for `uip` are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 **Docs**
 - [docs/INSTALL.md](docs/INSTALL.md): setup for students and customers, each with their own Xray and TM accounts.
@@ -29,19 +44,22 @@ In this section, `DEMO` is your sandbox Jira project and TM project.
 
 1. **Show Xray → sync → show TM.**
    - Show the Xray tests and their descriptions in Jira project DEMO.
-   - Sync: `xray-tm-sync pull` → `plan` → `apply --yes` → `testsets --yes`.
+   - `xr tests list --project DEMO --output table`.
+   - Sync: `xr sync pull` → `plan` → `apply --yes` → `testsets --yes`.
    - Show the TM test cases and the TM test set in TM project DEMO.
 2. **Mock run → results to Xray.**
-   - `xray-tm-demo execute --yes` (all Passed by default).
+   - `xr demo execute --yes` (all Passed by default).
    - Show "Passed" in TM.
-   - `xray-tm-demo report --yes`, then show the new `[MOCK]` Xray Test Execution in Jira.
-3. **Between rehearsals:** `xray-tm-demo reset --xray-project DEMO --tm-project DEMO --reseed --yes`.
+   - `xr demo report --yes`, then show the new `[MOCK]` Xray Test Execution in Jira.
+3. **Between rehearsals:** `xr demo reset --xray-project DEMO --tm-project DEMO --reseed --yes`.
 
 ## Design decisions
 
 | Topic | Decision | Why |
 |---|---|---|
-| Skill split | Production `xray-tm-sync` and demo `xray-tm-demo` | Customers get a skill with no delete, seed or mock code paths. The demo can be destructive inside a registered sandbox only. |
+| One codebase | All code in the `xr` package; the skills hold instructions only | The agent has no hidden code path: it runs the commands a person or a pipeline runs, with the same output and command trail. |
+| Command style | `xr` copies `uip` (envelope, `--output`, `--output-filter`, exit codes, dry run until `--yes`) | Teams already scripting `uip` can script Xray the same way, and `xr` could become a `uip` tool later. |
+| Skill split | `xray` (objects), `xray-tm-sync` (production sync), `xray-tm-demo` (demo) | The production sync never deletes. `xr demo` ships in the same package but refuses any Jira/TM project pair that isn't registered as a sandbox, and the production skill never calls it. `xr tests delete` exists for single Xray tests, dry run until `--yes`, as `uip tm testcases delete` does. |
 | Xray API | GraphQL (`getExpandedTests`), Xray Cloud only | No Xray Cloud REST endpoint returns manual step definitions. One paged query also returns the steps, preconditions, test sets, repository folder and Jira fields. Xray Server/DC has no GraphQL. |
 | TM API | `uip tm … --output json` only (production) | Reuses your `uip login` OAuth session (browser login, or client credentials in CI). The demo makes one documented exception: TM API v2 `DELETE …/testexecutions/{id}`, because `uip` cannot delete TM test executions. |
 | Xray auth | `XRAY_CLIENT_ID` / `XRAY_CLIENT_SECRET` env vars → 24 h JWT, kept in memory only | Xray Cloud has no OAuth or user-delegated login. |
@@ -79,44 +97,47 @@ In this section, `DEMO` is your sandbox Jira project and TM project.
 ## Layout
 
 ```
-xray-tm-sync/                       production skill
-  SKILL.md
-  references/                       terminology, field mapping, test sets & results & evidence, Xray GraphQL
-  scripts/xray_tm_sync.py           check | pull | plan | apply | testsets | report | status
-xray-tm-demo/                       demo skill (needs xray-tm-sync installed next to it)
-  SKILL.md
-  references/demo-operations.md     seed, mock run, mock report, reset
-  assets/seed-stock-trading.json    8 demo Xray tests + 1 Xray test set
-  scripts/xray_tm_demo.py           sandbox | seed | execute | report | reset
-docs/                               INSTALL (students/customers), DEMO (chapters), REHEARSAL (live evidence)
-tests/                              pytest + fake `uip` (in-memory TM) + recorded GraphQL pages
+src/xr/                             the only code
+  cli.py                            `xr` entry point, global --output / --output-filter
+  output.py                         uip-style envelope and table output
+  resources.py                      login | project | tests | testsets | testexecutions | testplans
+  sync.py                           xr sync: check | pull | plan | apply | testsets | report | status
+  demo.py                           xr demo: sandbox | seed | execute | report | reset
+  data/seed-stock-trading.json      8 demo Xray tests + 1 Xray test set
+xray/SKILL.md                       skill: xr object commands
+xray-tm-sync/                       skill: xr sync (SKILL.md + references: terminology, field mapping, results, GraphQL)
+xray-tm-demo/                       skill: xr demo (SKILL.md + references/demo-operations.md)
+docs/                               INSTALL, DEMO (chapters), REHEARSAL (live evidence), ROADMAP
+tests/                              pytest + fake `uip` (in-memory TM) + fake Xray + recorded GraphQL pages
 ```
 
 ## Use
 
 ```bash
-# Xray API key in ~/.config/xray-tm-sync/xray.env (chmod 600) or as env vars — see docs/INSTALL.md
-S=~/.claude/skills/xray-tm-sync/scripts/xray_tm_sync.py
-D=~/.claude/skills/xray-tm-demo/scripts/xray_tm_demo.py
+xr login                                          # once; stores the Xray API key (mode 600)
+xr project list --output table
+xr tests list --project DEMO --output-filter '[].{Key: Key, Summary: Summary}'
+xr testexecutions get DEMO-17 --output table
 
-# production
-$S check    --tm-project DEMO
-$S pull     --jql 'project = DEMO AND issuetype = Test'
-$S plan     --tm-project DEMO && $S apply --yes
-$S testsets --tm-project DEMO --yes
-$S report   --tm-project DEMO --execution-id <uuid> --yes          # real TM results only
+# production sync
+xr sync check    --tm-project DEMO
+xr sync pull     --jql 'project = DEMO AND issuetype = Test'
+xr sync plan     --tm-project DEMO && xr sync apply --yes
+xr sync testsets --tm-project DEMO --yes
+xr sync report   --tm-project DEMO --execution-id <uuid> --yes     # real TM results only
 
 # demo (sandbox pair registered once)
-$D sandbox add --xray-project DEMO --tm-project DEMO
-$D execute --xray-project DEMO --tm-project DEMO --tm-test-set DEMO:21 --yes
-$D report  --xray-project DEMO --tm-project DEMO --execution-id <uuid> --yes
-$D reset   --xray-project DEMO --tm-project DEMO --reseed         # dry run; add --yes
+xr demo sandbox add --xray-project DEMO --tm-project DEMO
+xr demo execute --xray-project DEMO --tm-project DEMO --tm-test-set DEMO:21 --yes
+xr demo report  --xray-project DEMO --tm-project DEMO --execution-id <uuid> --yes
+xr demo reset   --xray-project DEMO --tm-project DEMO --reseed     # dry run; add --yes
 ```
 
 ## Develop
 
 ```bash
 uv run pytest -q
+uv tool install --editable .        # `xr` on your PATH, running this checkout
 ```
 
 ## Not supported

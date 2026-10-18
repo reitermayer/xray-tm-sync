@@ -5,8 +5,12 @@
 - **Target app:** [reitermayer/trade-demo](https://github.com/reitermayer/trade-demo). Deployed at https://www.reitermayer.com/trade/ (`./deploy.sh` in that repo).
 - **Automations:** one per seeded Xray test, titled with the Xray test summary, so they pair with the TM test cases by name (see `trade-demo/docs/AUTOMATION.md`).
 - **Link:** `trade-demo/automation/link-automations.sh` links each TM test case to its automation, without AI.
-- **Run and report:** `uip tm testsets run --execution-type automated --wait`, then `xray_tm_sync.py report --yes`. This is the first production `report` of a real TM test execution.
+- **Run and report:** `uip tm testsets run --execution-type automated --wait`, then `xr sync report --yes`. This is the first production `report` of a real TM test execution.
 - **Open question:** which robot type runs the package (serverless, VM or unattended).
+
+## `xr` as a real `uip` tool
+
+`uip` 1.203 loads only tools on a fixed allow-list of `@uipath/*` packages (`TOOLS_WHITELIST` in `@uipath/cli`); any other package in `node_modules/@uipath/` is skipped. So `uip xr …` can't be added from outside. `xr` copies `uip`'s conventions (envelope, `--output`, `--output-filter`, exit codes, dry run until `--yes`) so that it could become `@uipath/xray-tool` with little rework. Ask UiPath for either that, or support for third-party tools.
 
 ## Wishes for `uip tm` (uip 1.203)
 

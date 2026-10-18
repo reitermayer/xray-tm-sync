@@ -1,8 +1,6 @@
-"""Shared fixtures: loads xray-tm-sync as `core` and xray-tm-demo as `demo`, a fake `uip`, a fake Xray."""
-import importlib.util
+"""Shared fixtures: `xr sync` as `core` and `xr demo` as `demo`, a fake `uip`, a fake Xray."""
 import json
 import os
-import sys
 from pathlib import Path
 
 import httpx
@@ -14,17 +12,8 @@ FAKE_UIP = ROOT / "tests" / "fake_uip.py"
 TM_PROJECT = "XRSYNC"
 
 
-def _load(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module  # before exec: dataclasses look the module up by name
-    spec.loader.exec_module(module)
-    return module
-
-
 os.environ["XRAY_TM_SETTLE_SECONDS"] = "0"
-core = _load("xray_tm_sync", ROOT / "xray-tm-sync" / "scripts" / "xray_tm_sync.py")
-demo = _load("xray_tm_demo", ROOT / "xray-tm-demo" / "scripts" / "xray_tm_demo.py")  # reuses `core`
+from xr import demo, sync as core  # noqa: E402  (after the env var: sync reads it at import)
 
 
 def raw_tests():

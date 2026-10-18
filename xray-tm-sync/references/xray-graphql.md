@@ -44,7 +44,7 @@ query($jql: String, $since: String, $limit: Int!, $start: Int) {
 
 ## Limits
 
-- `limit` ≤ 100 per connection; the script pages with `start` until `total`.
+- `limit` ≤ 100 per connection; `xr` pages with `start` until `total`.
 - ≤ 10 000 items per query, nested connections multiply: 100 tests × (10 preconditions + 20 Xray test sets) = 3 000.
 - ≤ 25 resolvers per query.
 - Rate: 300 requests / 5 min (Standard), 1 000 (Enterprise). HTTP 429 → wait `Retry-After`, back off.

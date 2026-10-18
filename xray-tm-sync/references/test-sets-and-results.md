@@ -41,9 +41,9 @@ Every run writes to `.xray-tm-sync/evidence/`. The run name is `<YYYYmmdd-HHMMSS
 
 | File | Content |
 |---|---|
-| `<run>.jsonl` | One line per call: the script invocation, then every `uip` call (`argv`, `ok`, `ms`) and every Xray request. Xray requests are logged by GraphQL operation and variables, or as the REST import with the Xray keys sent, plus the HTTP status. |
-| `<run>.sh` | The `uip` calls as shell lines (failed calls are commented out). The header names the script invocation that produced them. |
+| `<run>.jsonl` | One line per call: the `xr` invocation, then every `uip` call (`argv`, `ok`, `ms`) and every Xray request. Xray requests are logged by GraphQL operation and variables, or as the REST import with the Xray keys sent, plus the HTTP status. |
+| `<run>.sh` | The `uip` calls as shell lines (failed calls are commented out). The header names the `xr` invocation that produced them. |
 
 - **No secrets.** The trail never contains secrets: no headers, tokens or client secret.
-- **How to repeat.** The `.sh` file is an audit record, not a replay script. Replaying `testcases create` lines would create duplicates. To repeat a run, call the script invocation from the header again; it plans before it writes.
+- **How to repeat.** The `.sh` file is an audit record, not a replay script. Replaying `testcases create` lines would create duplicates. To repeat a run, call the `xr` invocation from the header again; it plans before it writes.
 - **Output.** Every subcommand's JSON output names its trail files under `evidence`.

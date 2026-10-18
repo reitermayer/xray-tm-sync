@@ -2,6 +2,8 @@
 
 This was a full run of [DEMO.md](DEMO.md) chapters 0–4 against **Jira project UIP** (Xray Cloud, global host) and **TM project XCA** (a UiPath Automation Cloud tenant). The skills ran from `~/.claude/skills`, as installed.
 
+The rehearsal ran the skill scripts that `xr` 0.2 replaced; the same commands are now `xr demo …` and `xr sync …` (same code, moved into the `xr` package).
+
 Every number below comes from the command trail in `.xray-tm-sync/evidence/`, which is not committed because it contains tenant data.
 
 | Chapter | Command | Result | `uip` calls | Xray requests |
@@ -47,4 +49,4 @@ uip tm customfield value get --project-key XCA --object-type TestCase \
   - XCA:13–21 and the mock TM test execution
   - the CALC fixture leftovers (XCA:1–4, 6, 7)
 
-Before a recording: `xray_tm_demo.py reset --xray-project UIP --tm-project XCA --reseed --yes` brings this back to the seed alone.
+Before a recording: `xr demo reset --xray-project UIP --tm-project XCA --reseed --yes` brings this back to the seed alone.

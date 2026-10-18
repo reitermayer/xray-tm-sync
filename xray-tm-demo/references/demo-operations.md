@@ -4,7 +4,7 @@ Every command needs `--xray-project <JIRA_PROJECT_KEY> --tm-project <TM_PROJECT_
 
 ## Seed (`seed`, and step 2 of `reset --reseed`)
 
-`assets/seed-stock-trading.json` contains 8 Manual Xray tests: UiPath/PATH, Oracle/ORCL and Amazon/AMZN orders, with the steps written as text in the Jira description. It also contains the Xray test set "Stock trading regression".
+The seed file `src/xr/data/seed-stock-trading.json` (inside the `xr` package; `--seed <file>` takes another) contains 8 Manual Xray tests: UiPath/PATH, Oracle/ORCL and Amazon/AMZN orders, with the steps written as text in the Jira description. It also contains the Xray test set "Stock trading regression".
 
 - **Xray tests:** one `createTest(testType: {name: "Manual"}, jira: {fields: {project: {key}, summary, description, labels}})` per seed test.
 - **Xray test set:** `createTestSet(testIssueIds, jira)`.
@@ -23,7 +23,7 @@ Verified protocol (uip 1.203, 17.10.2026):
    - The JSON is the step log rows from step 3, with camelCase keys and with `result`, `hasError` and `comment` set.
 
 Details:
-- **Ids.** `uip tm testsets list-testcases` rows carry no TM case id, so the script resolves ids through `uip tm testcases list`.
+- **Ids.** `uip tm testsets list-testcases` rows carry no TM case id, so `xr demo` resolves ids through `uip tm testcases list`.
 - **Outcomes file.** Every result defaults to Passed. Example: `{"UIP-3": "Failed", "UIP-4": {"result": "Failed", "failed_step": 2, "comment": "…"}}`.
   - With `failed_step: n`, the steps before n are Passed, step n is Failed and the rest are None.
   - Without `failed_step`, the last step fails.
@@ -31,7 +31,7 @@ Details:
 
 ## Mock results to Xray (`report`)
 
-- **Same import as production.** `xray-tm-sync`'s `collect_tm_results` → `build_xray_json` → `publish_results`, i.e. `POST /api/v2/import/execution`.
+- **Same import as production.** `xr sync`'s `collect_tm_results` → `build_xray_json` → `publish_results`, i.e. `POST /api/v2/import/execution`.
 - **Marked as mock.** The summary starts with `[MOCK] ` and the description adds "Mock results — not real test outcomes."
 - **Test environment.** Pass `--test-environment TM-mock` only if that Xray test environment exists in the Jira project. The Xray import rejects unknown ones with HTTP 400 ("environments dont exist"); verified live on 17.10.2026.
 - **Refused** when any Xray key does not belong to the sandbox Jira project, or when the TM test execution has no mock results (real results go through xray-tm-sync).

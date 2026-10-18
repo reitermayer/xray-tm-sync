@@ -1,9 +1,4 @@
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["httpx>=0.27"]
-# ///
-"""xray-tm-sync: Xray Cloud → UiPath Test Manager (TM), production sync.
+"""xr sync: Xray Cloud → UiPath Test Manager (TM), production sync.
 
 Intake of Xray tests as TM test cases, Xray test sets as TM test sets, and results of real TM test
 executions back to Xray as Xray test executions. Never deletes TM test cases, TM test sets or anything in Xray.
@@ -16,7 +11,8 @@ Xray: Cloud GraphQL (read) and the Xray JSON results import (`report --yes`), au
 XRAY_CLIENT_ID / XRAY_CLIENT_SECRET. TM: only the `uip tm` CLI with the user's `uip login` session.
 
 Subcommands: check | pull | plan | apply | testsets | report | status
-The demo skill xray-tm-demo imports this module and adds seed, mock execution and reset.
+The CLI is `xr sync …` (xr/cli.py); the skills xray-tm-sync and xray-tm-demo only document `xr` commands.
+`xr demo` (xr/demo.py) imports this module and adds seed, mock execution and reset.
 """
 from __future__ import annotations
 
@@ -114,7 +110,7 @@ def start_trail(workdir: Path, tool: str, subcommand: str, argv: list[str]) -> N
         n += 1
         run = f"{run.rsplit('~', 1)[0]}~{n}"
     _TRAIL["jsonl"], _TRAIL["sh"] = folder / f"{run}.jsonl", folder / f"{run}.sh"
-    rerun = shlex.join([tool, *argv])
+    rerun = shlex.join([*tool.split(), *argv])
     _TRAIL["sh"].write_text(
         "#!/bin/sh\n"
         f"# uip calls made by: {rerun}  ({local_timestamp()})\n"
@@ -169,7 +165,7 @@ def xray_secrets_file() -> Path:
 
 
 def load_xray_secrets() -> None:
-    """Fill missing XRAY_* variables from the secrets file. Environment variables always win."""
+    """Fill missing XRAY_* / JIRA_* variables from the secrets file. Environment variables always win."""
     path = xray_secrets_file()
     if not path.is_file():
         return
@@ -178,7 +174,7 @@ def load_xray_secrets() -> None:
     for line in path.read_text().splitlines():
         name, sep, value = line.strip().removeprefix("export ").partition("=")
         name = name.strip()
-        if sep and name.startswith("XRAY_") and not os.environ.get(name):
+        if sep and name.startswith(("XRAY_", "JIRA_")) and not os.environ.get(name):
             os.environ[name] = value.strip().strip("'\"")
 
 
@@ -271,6 +267,49 @@ class XrayClient:
             log(f"Xray: pulled {start}/{page.get('total', '?')}")
             if not results or start >= (page.get("total") or 0):
                 return
+
+    # Writes and generic listings, used by `xr tests|testsets|testexecutions` and by `xr demo`.
+
+    def iter_issues(self, getter: str, jql: str, fields: str = 'issueId jira(fields: ["key", "summary", "description"])'):
+        query = f"""
+query($jql: String, $limit: Int!, $start: Int) {{
+  page: {getter}(jql: $jql, limit: $limit, start: $start) {{
+    total start limit
+    results {{ {fields} }}
+  }}
+}}"""
+        start = 0
+        while True:
+            page = self.graphql(query, {"jql": jql, "limit": XRAY_PAGE, "start": start})["page"]
+            results = page.get("results") or []
+            yield from results
+            start += len(results)
+            if not results or start >= (page.get("total") or 0):
+                return
+
+    def delete(self, mutation: str, xray_issue_id: str) -> None:
+        self.graphql(f"mutation($id: String!) {{ {mutation}(issueId: $id) }}", {"id": xray_issue_id})
+
+    def create_test(self, jira_project: str, summary: str, description: str, labels: list[str]) -> dict:
+        """Manual Xray test without Xray steps (the steps live in the description)."""
+        data = self.graphql(
+            """mutation($jira: JSON!) {
+  createTest(testType: { name: "Manual" }, jira: $jira) { test { issueId jira(fields: ["key"]) } warnings }
+}""",
+            {"jira": {"fields": {"project": {"key": jira_project}, "summary": summary,
+                                 "description": description, "labels": labels}}},
+        )["createTest"]
+        return {"xray_issue_id": data["test"]["issueId"], "xray_key": data["test"]["jira"]["key"]}
+
+    def create_test_set(self, jira_project: str, summary: str, description: str, xray_issue_ids: list[str]) -> dict:
+        data = self.graphql(
+            """mutation($jira: JSON!, $ids: [String]) {
+  createTestSet(testIssueIds: $ids, jira: $jira) { testSet { issueId jira(fields: ["key"]) } warnings }
+}""",
+            {"jira": {"fields": {"project": {"key": jira_project}, "summary": summary, "description": description}},
+             "ids": xray_issue_ids},
+        )["createTestSet"]
+        return {"xray_issue_id": data["testSet"]["issueId"], "xray_key": data["testSet"]["jira"]["key"]}
 
 
 def adf_to_text(node: Any) -> str:
@@ -614,9 +653,15 @@ def history_log(entry: dict) -> None:
         f.write(json.dumps({"time": local_timestamp(), **entry}, ensure_ascii=False) + "\n")
 
 
+EMIT_HOOK: Any = None  # set by xr/cli.py: wraps the output in the uip-style envelope
+
+
 def emit(data: Any) -> None:
     if isinstance(data, dict) and _TRAIL:
         data = data | {"evidence": trail_paths()}
+    if EMIT_HOOK:
+        EMIT_HOOK(data)
+        return
     print(json.dumps(data, indent=2, ensure_ascii=False))
 
 
@@ -1156,7 +1201,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="xray_tm_sync", description=__doc__.split("\n\n")[0])
+    p = argparse.ArgumentParser(prog="xr sync", description=__doc__.split("\n\n")[0])
     p.add_argument("--workdir", default=".xray-tm-sync", help="state folder (default: ./.xray-tm-sync)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -1197,7 +1242,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("status", help="summarize the last snapshot, plan and report")
 
     args = p.parse_args(argv)
-    start_trail(Path(args.workdir), "xray_tm_sync.py", args.cmd, sys.argv[1:] if argv is None else argv)
+    start_trail(Path(args.workdir), "xr sync", args.cmd, sys.argv[1:] if argv is None else argv)
     handler = {"check": cmd_check, "pull": cmd_pull, "plan": cmd_plan, "apply": cmd_apply, "testsets": cmd_testsets,
                "report": cmd_report, "status": cmd_status}[args.cmd]
     try:

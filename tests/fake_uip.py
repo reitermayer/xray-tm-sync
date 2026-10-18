@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Minimal stand-in for `uip tm …` used by the tests. State lives in $FAKE_UIP_STATE (JSON).
 
-Only the commands xray_tm_sync.py and xray_tm_demo.py call are implemented; anything else fails loudly.
+Only the commands `xr sync` and `xr demo` call are implemented; anything else fails loudly.
 Every call is appended to state["calls"] so tests can assert on the CLI traffic.
 """
 import json

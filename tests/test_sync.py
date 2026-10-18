@@ -433,13 +433,13 @@ def test_every_run_leaves_a_command_trail_without_secrets(env, tmp_path, capsys,
     out = json.loads(capsys.readouterr().out)
     trail_jsonl, trail_sh = out["evidence"]["jsonl"], out["evidence"]["sh"]
     entries = [json.loads(line) for line in open(trail_jsonl)]
-    assert entries[0]["tool"] == "xray_tm_sync.py" and "report" in entries[0]["argv"]
+    assert entries[0]["tool"] == "xr sync" and "report" in entries[0]["argv"]
     assert any(e.get("rest") == "POST /api/v2/import/execution" and e["http"] == 200 for e in entries)
     assert any(e["tool"] == "uip" and e["argv"][:3] == ["tm", "executions", "testcaselogs"] for e in entries)
     everything = open(trail_jsonl).read() + open(trail_sh).read()
     assert "s3cr3t-value" not in everything and "jwt" not in everything
     sh = open(trail_sh).read()
-    assert sh.startswith("#!/bin/sh\n# uip calls made by: xray_tm_sync.py ") and " report " in sh and "\nuip tm executions testcaselogs list" in sh
+    assert sh.startswith("#!/bin/sh\n# uip calls made by: xr sync ") and " report " in sh and "\nuip tm executions testcaselogs list" in sh
 
     apply_runs = list((tmp_path / "work" / "evidence").glob("*-apply.sh"))
     assert apply_runs and "uip tm testcases create --name 'Login with valid credentials'" in apply_runs[0].read_text()
