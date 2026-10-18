@@ -15,6 +15,25 @@ def test_adf_description_becomes_plain_text():
     assert by_key()["CALC-101"]["description"] == "Checks the happy path.\n\n- Chrome\n- Edge"
 
 
+def test_adf_marks_headings_and_code_become_markdown():
+    adf = {"type": "doc", "content": [
+        {"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "Goal"}]},
+        {"type": "paragraph", "content": [
+            {"type": "text", "text": "Buy "}, {"type": "text", "text": "AMZN", "marks": [{"type": "strong"}]},
+            {"type": "text", "text": " via "},
+            {"type": "text", "text": "docs", "marks": [{"type": "link", "attrs": {"href": "https://x.test"}}]}]},
+        {"type": "codeBlock", "attrs": {"language": "json"}, "content": [{"type": "text", "text": '{"qty": 1}'}]},
+    ]}
+    assert core.norm_text(core.adf_to_markdown(adf)) == '## Goal\n\nBuy **AMZN** via [docs](https://x.test)\n\n```json\n{"qty": 1}\n```'
+
+
+def test_single_line_breaks_become_paragraphs_but_lists_and_code_stay_together():
+    text = "Verify X.\nSteps: 1) a 2) b\nExpected: ok\n\n- Chrome\n- Edge\n```\nline 1\nline 2\n```"
+    assert core.md_paragraphs(text) == (
+        "Verify X.\n\nSteps: 1) a 2) b\n\nExpected: ok\n\n- Chrome\n- Edge\n```\nline 1\nline 2\n```"
+    )
+
+
 def test_wiki_markup_description_passes_through():
     assert by_key()["CALC-102"]["description"].startswith("h3. Wiki markup")
 
@@ -23,9 +42,9 @@ def test_manual_xray_test_maps_steps_precondition_and_labels():
     tm_case = core.render_tm_case(by_key()["CALC-101"], "https://acme.atlassian.net")
     assert tm_case["name"] == "Login with valid credentials"
     assert tm_case["description"].endswith(
-        "— Imported from Xray test CALC-101 (https://acme.atlassian.net/browse/CALC-101)"
+        "— Imported from Xray test [CALC-101](https://acme.atlassian.net/browse/CALC-101)"
     )
-    assert tm_case["pre_condition"] == "[CALC-50] Registered user\nA registered user exists"
+    assert tm_case["pre_condition"] == "**[CALC-50] Registered user**\n\nA registered user exists"
     assert tm_case["steps"][1] == {
         "description": "Enter user and password",
         "clipboardData": "user=alice\npassword=***",
@@ -45,10 +64,10 @@ def test_manual_xray_test_maps_steps_precondition_and_labels():
 def test_cucumber_and_generic_go_into_description_without_steps():
     xs = by_key()
     cucumber = core.render_tm_case(xs["CALC-102"], None)
-    assert "Xray Cucumber scenario:\nScenario: Locked account" in cucumber["description"]
+    assert "**Xray Cucumber scenario**\n\n```gherkin\nScenario: Locked account" in cucumber["description"]
     assert cucumber["steps"] == []
     generic = core.render_tm_case(xs["CALC-103"], None)
-    assert "Xray generic definition:\nRun the nightly" in generic["description"]
+    assert "**Xray generic definition**\n\n```\nRun the nightly" in generic["description"]
     assert "XR_Folder_/" not in " ".join(generic["labels"])  # root repository folder is not a label
 
 
@@ -157,7 +176,7 @@ def test_first_intake_creates_everything(env):
     assert sorted(st["fields"]) == ["TestCase:Xray Intake", "TestCase:Xray Key"]
     assert len(st["cases"]) == 4
     calc101 = next(c for c in st["cases"].values() if c["Name"] == "Login with valid credentials")
-    assert calc101["PreCondition"].startswith("[CALC-50]")
+    assert calc101["PreCondition"].startswith("**[CALC-50]")
     assert [s["Description"] for s in st["steps"][calc101["Id"]]][0] == "Open the login page"
     assert st["values"][calc101["Id"]]["Xray Key"]["Value"] == "CALC-101"
     intake = json.loads(st["values"][calc101["Id"]]["Xray Intake"]["Value"])

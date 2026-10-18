@@ -3,8 +3,8 @@
 | TM field | Source | Notes |
 |---|---|---|
 | Name | Jira `summary` | Truncated to 250 characters; falls back to the Xray key |
-| Description | Jira `description` → plain text, plus Gherkin / generic definition, plus origin footer | ADF (Jira Cloud) is flattened to text with `-`/`1.` lists; wiki markup passes through unchanged. Footer: `— Imported from Xray test CALC-123 (<jira>/browse/CALC-123)` |
-| Precondition | Xray preconditions | `[CALC-9] <summary>` + newline + definition, joined by blank lines. Only the first 10 are read; a warning names the rest |
+| Description | Jira `description` → Markdown, plus Gherkin / generic definition, plus origin footer | TM renders descriptions as Markdown. ADF (Jira Cloud) becomes Markdown: headings, bold/italic/code, links, `-`/`1.` lists, tables, fenced code blocks; wiki markup passes through unchanged. Single line breaks become blank lines (lists, quotes, tables and code stay together). Gherkin / generic definition go into a fenced code block under a bold heading. Footer: `— Imported from Xray test [CALC-123](<jira>/browse/CALC-123)` |
+| Precondition | Xray preconditions | `**[CALC-9] <summary>**` + blank line + definition (Markdown), joined by blank lines. Only the first 10 are read; a warning names the rest |
 | Steps | Xray steps (Manual only) | action → description (`(no action)` if empty), data → clipboard data, expected result → expected result. Called Xray tests are inlined (`getExpandedTests`) |
 | Labels | Derived | `XR_Imported`, `XR_Type_<Manual\|Cucumber\|Generic>`, `XR_Folder_<repository path>` (not for `/`), `XR_Label_<jira label>`, `XR_Set_<xray test set key>`; spaces → `_` |
 | Custom field `Xray Key` (Text) | Xray key | Origin marker, written right after the TM test case is created. Name overridable with `XRAY_ID_FIELD` (e.g. `XRAY_ID`, the field the Avalon MCP servers use) |
@@ -27,6 +27,8 @@ the TM steps again and the next update replaces them.
 | yes | yes | `drift` — skipped unless the user passes `--accept-drift <XRAY_KEY>` |
 | marker present, intake record empty | — | `update` (repairs a partial earlier intake) |
 
+`xrayHash` covers the normalized Xray test and the rendered TM content, so a change in this mapping
+(for example the Markdown formatting) updates every synced TM test case once; drift protection still applies.
 `tmHash` covers name, description and steps as read back from TM. The TM precondition is not part of it
 because `uip tm testcases list` does not return it. Non-`XR_` labels are never added or removed.
 

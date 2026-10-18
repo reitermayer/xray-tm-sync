@@ -312,35 +312,73 @@ query($jql: String, $limit: Int!, $start: Int) {{
         return {"xray_issue_id": data["testSet"]["issueId"], "xray_key": data["testSet"]["jira"]["key"]}
 
 
-def adf_to_text(node: Any) -> str:
-    """Atlassian Document Format → plain text. Strings (wiki markup) pass through."""
+ADF_MARKS = {"strong": "**", "em": "*", "strike": "~~", "code": "`"}
+
+
+def adf_to_markdown(node: Any) -> str:
+    """Atlassian Document Format → Markdown (TM descriptions render Markdown). Strings (wiki markup) pass through."""
     if node is None:
         return ""
     if isinstance(node, str):
         return node
     if isinstance(node, list):
-        return "".join(adf_to_text(n) for n in node)
+        return "".join(adf_to_markdown(n) for n in node)
     kind = node.get("type")
     content = node.get("content") or []
+    attrs = node.get("attrs") or {}
     if kind == "text":
-        return node.get("text", "")
+        text = node.get("text", "")
+        for mark in node.get("marks") or []:
+            if mark.get("type") in ADF_MARKS and text.strip():
+                text = f"{ADF_MARKS[mark['type']]}{text}{ADF_MARKS[mark['type']]}"
+            elif mark.get("type") == "link" and (mark.get("attrs") or {}).get("href"):
+                text = f"[{text}]({mark['attrs']['href']})"
+        return text
     if kind == "hardBreak":
         return "\n"
     if kind in ("mention", "emoji", "inlineCard"):
-        attrs = node.get("attrs") or {}
         return attrs.get("text") or attrs.get("shortName") or attrs.get("url") or ""
     if kind in ("bulletList", "orderedList"):
         items = []
         for i, item in enumerate(content, 1):
             bullet = f"{i}." if kind == "orderedList" else "-"
-            items.append(f"{bullet} {adf_to_text(item.get('content') or []).strip()}")
+            items.append(f"{bullet} {adf_to_markdown(item.get('content') or []).strip()}")
         return "\n".join(items) + "\n\n"
     if kind == "tableRow":
-        return " | ".join(adf_to_text(c.get("content") or []).strip() for c in content) + "\n"
-    inner = "".join(adf_to_text(c) for c in content)
-    if kind in ("paragraph", "heading", "codeBlock", "blockquote", "panel", "table"):
+        return "| " + " | ".join(adf_to_markdown(c.get("content") or []).strip() for c in content) + " |\n"
+    inner = "".join(adf_to_markdown(c) for c in content)
+    if kind == "codeBlock":
+        return f"```{attrs.get('language') or ''}\n{inner.rstrip()}\n```\n\n"
+    if kind == "heading":
+        return f"{'#' * int(attrs.get('level') or 3)} {inner.strip()}\n\n"
+    if kind in ("blockquote", "panel"):
+        return "\n".join(f"> {line}" for line in inner.strip().splitlines()) + "\n\n"
+    if kind == "table":
+        rows = inner.rstrip("\n").split("\n")
+        if rows:  # Markdown tables need a separator row under the first row
+            rows.insert(1, "|" + " --- |" * rows[0].count(" | ") + " --- |")
+        return "\n".join(rows) + "\n\n"
+    if kind == "paragraph":
         return inner.rstrip("\n") + "\n\n"
     return inner
+
+
+MD_BLOCK_LINE = re.compile(r"\s*([-*+]|\d+[.)]|>|\|)\s")
+
+
+def md_paragraphs(text: str) -> str:
+    """Single line breaks → blank lines, so Markdown keeps them; list, quote, table and code lines stay together."""
+    out: list[str] = []
+    fenced = False
+    for line in text.split("\n"):
+        prev = out[-1] if out else ""
+        if line.startswith("```"):
+            fenced = not fenced
+        elif not fenced and out and line.strip() and prev.strip() and not prev.startswith("```") \
+                and not (MD_BLOCK_LINE.match(line) and MD_BLOCK_LINE.match(prev)):
+            out.append("")
+        out.append(line)
+    return "\n".join(out)
 
 
 def normalize_xray_test(raw: dict) -> dict:
@@ -377,7 +415,7 @@ def normalize_xray_test(raw: dict) -> dict:
         "xray_test_type": test_type.get("name") or "Unknown",
         "xray_test_kind": test_type.get("kind") or "",
         "summary": norm_text(jira.get("summary")),
-        "description": norm_text(adf_to_text(jira.get("description"))),
+        "description": norm_text(adf_to_markdown(jira.get("description"))),
         "jira_labels": sorted(jira.get("labels") or []),
         "xray_repo_path": (raw.get("folder") or {}).get("path") or "",
         "gherkin": norm_text(raw.get("gherkin")),
@@ -411,19 +449,20 @@ def render_tm_case(x: dict, jira_base: str | None) -> dict:
     if len(name) > TM_NAME_MAX:
         name = name[: TM_NAME_MAX - 1] + "…"
 
-    parts = [x["description"]] if x["description"] else []
+    # TM renders descriptions and preconditions as Markdown.
+    parts = [md_paragraphs(x["description"])] if x["description"] else []
     if x["xray_test_kind"] == "Gherkin" and x["gherkin"]:
-        parts.append(f"Xray Cucumber scenario:\n{x['gherkin']}")
+        parts.append(f"**Xray Cucumber scenario**\n\n```gherkin\n{x['gherkin']}\n```")
     elif x["xray_test_kind"] == "Unstructured" and x["unstructured"]:
-        parts.append(f"Xray generic definition:\n{x['unstructured']}")
-    origin = f"Imported from Xray test {x['xray_key']}"
-    if jira_base:
-        origin += f" ({jira_base.rstrip('/')}/browse/{x['xray_key']})"
-    parts.append(f"— {origin}")
+        parts.append(f"**Xray generic definition**\n\n```\n{x['unstructured']}\n```")
+    key = x["xray_key"]
+    link = f"[{key}]({jira_base.rstrip('/')}/browse/{key})" if jira_base else key
+    parts.append(f"— Imported from Xray test {link}")
     description = "\n\n".join(parts)
 
     pre_condition = "\n\n".join(
-        f"[{p['xray_key']}] {p['summary']}".rstrip() + (f"\n{p['definition']}" if p["definition"] else "")
+        "**" + f"[{p['xray_key']}] {p['summary']}".rstrip() + "**"
+        + (f"\n\n{md_paragraphs(p['definition'])}" if p["definition"] else "")
         for p in x["preconditions"]
     )
 
@@ -754,7 +793,8 @@ def build_index(tm: TmCli, ws: Workspace, tm_cases: list[dict], fields_present: 
 def classify(tm: TmCli, x: dict, desired: dict, matches: list[dict]) -> dict:
     item: dict[str, Any] = {
         "xray_key": x["xray_key"],
-        "xray_hash": short_hash(x),
+        # Covers the rendered TM content too, so a change in the Xray → TM mapping re-syncs each case once.
+        "xray_hash": short_hash({"xray": x, "tm": desired}),
         "last_modified": x["last_modified"],
         "desired": desired,
         "warnings": x["warnings"],
@@ -778,13 +818,13 @@ def classify(tm: TmCli, x: dict, desired: dict, matches: list[dict]) -> dict:
     if not intake:
         return item | {"action": "update", "reason": "TM test case has no intake record (partial earlier intake)"}
     if intake.get("xrayHash") == item["xray_hash"]:
-        return item | {"action": "unchanged", "reason": "Xray test unchanged since last intake"}
+        return item | {"action": "unchanged", "reason": "Xray test and mapping unchanged since last intake"}
 
     tm_steps = tm.list_steps(tm_case["Id"]) if intake.get("stepsManaged", desired["manage_steps"]) else []
     current = tm_content_hash(tm_case.get("Name"), tm_case.get("Description"), tm_steps)
     if current != intake.get("tmHash"):
         return item | {"action": "drift", "reason": "TM test case was edited after the last intake; skipped"}
-    return item | {"action": "update", "reason": "Xray test changed since last intake"}
+    return item | {"action": "update", "reason": "Xray test or the Xray → TM mapping changed since last intake"}
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
