@@ -9,12 +9,12 @@ coding agent ─▶ skills (SKILL.md) ──┘     │
                                           └──▶ uip tm ──▶ UiPath Test Manager
 ```
 
-| `uip` (Test Manager) | `xr` (Xray) |
+| `xr` (Xray) | `uip` (Test Manager) |
 |---|---|
-| `uip tm project list` | `xr project list` |
-| `uip tm testcases list --project-key XCA` | `xr tests list --project UIP` |
-| `uip tm testsets list --project-key XCA` | `xr testsets list --project UIP` |
-| `uip tm executions list …` | `xr testexecutions list --project UIP` |
+| `xr project list` | `uip tm project list --filter "Xray CodingAgent"` |
+| `xr tests list --project UIP` | `uip tm testcases list --project-key XCA` |
+| `xr testsets list --project UIP` | `uip tm testsets list --project-key XCA` |
+| `xr testexecutions list --project UIP` | `uip tm executions list --project-key XCA` |
 
 Both print the envelope `{Result, Code, Data}`, take `--output json|table` and `--output-filter <JMESPath>`, and use the same exit codes. Every write is a dry run until `--yes`. (`uip xr …` itself is not possible: `uip` loads only tools from a fixed list of UiPath packages; see [docs/ROADMAP.md](docs/ROADMAP.md).)
 
