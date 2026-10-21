@@ -39,11 +39,9 @@ def test_wiki_markup_description_passes_through():
 
 
 def test_manual_xray_test_maps_steps_precondition_and_labels():
-    tm_case = core.render_tm_case(by_key()["CALC-101"], "https://acme.atlassian.net")
+    tm_case = core.render_tm_case(by_key()["CALC-101"])
     assert tm_case["name"] == "Login with valid credentials"
-    assert tm_case["description"].endswith(
-        "— Imported from Xray test [CALC-101](https://acme.atlassian.net/browse/CALC-101)"
-    )
+    assert tm_case["description"].endswith("— Imported from Xray test CALC-101")
     assert tm_case["pre_condition"] == "**[CALC-50] Registered user**\n\nA registered user exists"
     assert tm_case["steps"][1] == {
         "description": "Enter user and password",
@@ -63,10 +61,10 @@ def test_manual_xray_test_maps_steps_precondition_and_labels():
 
 def test_cucumber_and_generic_go_into_description_without_steps():
     xs = by_key()
-    cucumber = core.render_tm_case(xs["CALC-102"], None)
+    cucumber = core.render_tm_case(xs["CALC-102"])
     assert "**Xray Cucumber scenario**\n\n```gherkin\nScenario: Locked account" in cucumber["description"]
     assert cucumber["steps"] == []
-    generic = core.render_tm_case(xs["CALC-103"], None)
+    generic = core.render_tm_case(xs["CALC-103"])
     assert "**Xray generic definition**\n\n```\nRun the nightly" in generic["description"]
     assert "XR_Folder_/" not in " ".join(generic["labels"])  # root repository folder is not a label
 
@@ -80,7 +78,7 @@ def test_modular_xray_test_keeps_expanded_steps_and_warns_on_truncated_precondit
 
 def test_long_summary_is_truncated():
     x = by_key()["CALC-101"] | {"summary": "x" * 400}
-    assert len(core.render_tm_case(x, None)["name"]) == core.TM_NAME_MAX
+    assert len(core.render_tm_case(x)["name"]) == core.TM_NAME_MAX
 
 
 def test_expanded_step_list_values_are_joined():
@@ -95,7 +93,7 @@ def test_tm_content_hash_ignores_whitespace_noise():
 
 
 def test_xray_test_sets_become_labels():
-    assert {"XR_Set_CALC-200", "XR_Set_CALC-201"} <= set(core.render_tm_case(by_key()["CALC-101"], None)["labels"])
+    assert {"XR_Set_CALC-200", "XR_Set_CALC-201"} <= set(core.render_tm_case(by_key()["CALC-101"])["labels"])
 
 
 # --------------------------------------------------------------------------- Xray client and secrets

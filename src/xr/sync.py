@@ -443,7 +443,7 @@ def xray_set_label(xray_test_set_key: str) -> str:
     return f"{LABEL_PREFIX}Set_{xray_test_set_key}"
 
 
-def render_tm_case(x: dict, jira_base: str | None) -> dict:
+def render_tm_case(x: dict) -> dict:
     """Desired TM test case content for one normalized Xray test."""
     name = x["summary"] or x["xray_key"]
     if len(name) > TM_NAME_MAX:
@@ -455,9 +455,7 @@ def render_tm_case(x: dict, jira_base: str | None) -> dict:
         parts.append(f"**Xray Cucumber scenario**\n\n```gherkin\n{x['gherkin']}\n```")
     elif x["xray_test_kind"] == "Unstructured" and x["unstructured"]:
         parts.append(f"**Xray generic definition**\n\n```\n{x['unstructured']}\n```")
-    key = x["xray_key"]
-    link = f"[{key}]({jira_base.rstrip('/')}/browse/{key})" if jira_base else key
-    parts.append(f"— Imported from Xray test {link}")
+    parts.append(f"— Imported from Xray test {x['xray_key']}")
     description = "\n\n".join(parts)
 
     pre_condition = "\n\n".join(
@@ -839,12 +837,11 @@ def cmd_plan(args: argparse.Namespace) -> int:
     fields_present = TM_FIELD_XRAY_KEY in fields
     tm_cases = tm.list_cases()
     index = build_index(tm, ws, tm_cases, fields_present)
-    jira_base = args.jira_base_url or os.environ.get("XRAY_JIRA_BASE_URL")
 
     xray_tests = snapshot["xray_tests"]
     with ThreadPoolExecutor(WORKERS) as pool:
         items = list(
-            pool.map(lambda x: classify(tm, x, render_tm_case(x, jira_base), index.get(x["xray_key"], [])), xray_tests)
+            pool.map(lambda x: classify(tm, x, render_tm_case(x), index.get(x["xray_key"], [])), xray_tests)
         )
     accepted = set(args.accept_drift or [])
     for it in items:
@@ -1256,7 +1253,6 @@ def main(argv: list[str] | None = None) -> int:
 
     c = sub.add_parser("plan", help="diff snapshot against TM; writes plan.json, no TM writes")
     c.add_argument("--tm-project", required=True)
-    c.add_argument("--jira-base-url", help="e.g. https://acme.atlassian.net (for links in TM descriptions)")
     c.add_argument("--accept-drift", nargs="+", metavar="XRAY_KEY",
                    help="overwrite these drifted TM test cases from Xray (only after the user agreed)")
 

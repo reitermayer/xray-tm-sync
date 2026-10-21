@@ -40,10 +40,10 @@ Further references:
 
 - **TM:** the user's `uip login` session: browser OAuth, or in CI `uip login --client-id env.X --client-secret env.Y -t <tenant>`.
   - `xr sync` calls only `uip tm … --output json`, never TM REST.
-  - If `uip` is logged out, ask the user to run `! uip login --interactive`. Never run an interactive login yourself.
+  - If `uip` is logged out, ask the user to run `! uip login --authority <host> --organization <org> --tenant <tenant>` (it opens the browser sign-in). Never run an interactive login yourself.
 - **Xray Cloud:** Xray has no OAuth. A Jira admin creates an API key under Jira → Apps → Xray → API Keys.
   - The user stores it with `! xr login` (prompts for the client id and secret, verifies them, writes `~/.config/xray-tm-sync/xray.env` with mode 600). `xr login status` shows whether it works. Environment variables `XRAY_CLIENT_ID` / `XRAY_CLIENT_SECRET` override the file. `xr` refuses the file if others can read it.
-  - Optional settings: `XRAY_REGION` (eu, us or au; the default is global) and `XRAY_JIRA_BASE_URL` (used for links).
+  - Optional setting: `XRAY_REGION` (eu, us or au; the default is global).
   - `xr` exchanges the key for a 24 h token that it keeps in memory only.
   - **Never** ask the user to paste the secret into the chat, and never echo, log or write it.
   - `report --yes` needs a key whose Jira user may create issues. Intake needs read access only.

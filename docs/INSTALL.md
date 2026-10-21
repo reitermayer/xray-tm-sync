@@ -43,8 +43,14 @@ You don't need to install Python yourself, because uv fetches it when it is need
 ## 2. Log in to UiPath with `uip` (OAuth)
 
 ```bash
-uip login --interactive        # opens the browser, then pick your tenant
+uip login --authority https://cloud.uipath.com --organization <org> --tenant <tenant>
 uip login status               # shows "Logged in", your organization and your tenant
+```
+
+For example, on the UiPath staging cloud:
+
+```bash
+uip login --authority https://staging.uipath.com --organization reitermayer --tenant AgenticTesting
 ```
 
 - `uip` stores the OAuth tokens and refreshes them on its own. Neither `xr` nor the skills ever see a UiPath password.
@@ -89,7 +95,7 @@ xr login status       # "Status": "Logged in"
 ```
 
 - `xr login` writes `~/.config/xray-tm-sync/xray.env` with mode 600 and refuses to use it if other users can read it.
-- Optional lines in that file: `XRAY_REGION=eu` (global is the default; us, eu, au), `XRAY_JIRA_BASE_URL=https://yoursite.atlassian.net` (links in TM descriptions), and `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` if `xr project list` should list every Jira project (an Xray API key can't).
+- Optional lines in that file: `XRAY_REGION=eu` (global is the default; us, eu, au), and `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` if `xr project list` should list every Jira project (an Xray API key can't).
 - Environment variables with the same names override the file. That is the way to go in CI, where the pipeline's secret store sets them, or use `xr login --client-id <id> --client-secret-stdin`.
 - If you need a different location, set `XRAY_TM_SYNC_ENV=/path/to/file`.
 - **Never** put the key into the repository, a command line or a prompt. If you paste it into a chat with an agent, it is in that transcript, so rotate it in Jira.
@@ -134,7 +140,7 @@ Expected output of `xr sync check`: `"Result": "Success"` with `"ok": true`, you
 
 | Problem shown | Fix |
 |---|---|
-| `uip` not logged in | `uip login --interactive` |
+| `uip` not logged in | `uip login --authority <host> --organization <org> --tenant <tenant>` (see section 2) |
 | TM project not found | check the TM project key, and that you logged in to the right tenant |
 | `XRAY_CLIENT_ID / XRAY_CLIENT_SECRET are not set` | `xr login` |
 | `readable by other users` | `chmod 600 ~/.config/xray-tm-sync/xray.env` |
