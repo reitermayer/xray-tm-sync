@@ -90,7 +90,10 @@ def log(msg: str) -> None:
 
 def local_timestamp() -> str:
     # User convention: timestamps come from this exact command.
-    return subprocess.run(["date", "+%d.%m.%Y %H:%M"], capture_output=True, text=True).stdout.strip()
+    try:
+        return subprocess.run(["date", "+%d.%m.%Y %H:%M"], capture_output=True, text=True).stdout.strip()
+    except OSError:  # no `date` binary on Windows
+        return datetime.now().strftime("%d.%m.%Y %H:%M")
 
 
 # --------------------------------------------------------------------------- command trail
@@ -115,7 +118,8 @@ def start_trail(workdir: Path, tool: str, subcommand: str, argv: list[str]) -> N
         "#!/bin/sh\n"
         f"# uip calls made by: {rerun}  ({local_timestamp()})\n"
         "# This is an audit record. To repeat the run, call the line above again: it is idempotent and\n"
-        "# plans before it writes, whereas replaying these lines blindly would create duplicates.\n"
+        "# plans before it writes, whereas replaying these lines blindly would create duplicates.\n",
+        encoding="utf-8",
     )
     trail({"tool": tool, "argv": argv, "time": local_timestamp()})
 
@@ -123,14 +127,14 @@ def start_trail(workdir: Path, tool: str, subcommand: str, argv: list[str]) -> N
 def trail(entry: dict) -> None:
     if "jsonl" not in _TRAIL:
         return
-    with _TRAIL["jsonl"].open("a") as f:
+    with _TRAIL["jsonl"].open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 def trail_uip(cmd: list[str], ok: bool, ms: int) -> None:
     trail({"tool": "uip", "argv": cmd[1:], "ok": ok, "ms": ms})
     if "sh" in _TRAIL:
-        with _TRAIL["sh"].open("a") as f:
+        with _TRAIL["sh"].open("a", encoding="utf-8") as f:
             f.write(("" if ok else "# failed: ") + shlex.join(["uip", *cmd[1:]]) + "\n")
 
 
@@ -169,9 +173,9 @@ def load_xray_secrets() -> None:
     path = xray_secrets_file()
     if not path.is_file():
         return
-    if path.stat().st_mode & 0o077:
+    if os.name != "nt" and path.stat().st_mode & 0o077:  # Windows has no POSIX mode bits
         raise IntakeError(f"{path} is readable by other users. Run: chmod 600 '{path}'")
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         name, sep, value = line.strip().removeprefix("export ").partition("=")
         name = name.strip()
         if sep and name.startswith(("XRAY_", "JIRA_")) and not os.environ.get(name):
@@ -534,8 +538,10 @@ class TmCli:
 
     def __init__(self, tm_project_key: str):
         self.bin = os.environ.get("UIP_BIN", "uip")
-        if not shutil.which(self.bin):
+        resolved = shutil.which(self.bin)  # on Windows this finds uip.cmd, which subprocess can't find by bare name
+        if not resolved:
             raise IntakeError(f"`{self.bin}` CLI not found on PATH")
+        self.bin = resolved
         self.project = tm_project_key
         self.calls = 0
 
@@ -545,7 +551,7 @@ class TmCli:
         for attempt in range(1, RETRIES + 1):
             self.calls += 1
             started = time.monotonic()
-            proc = subprocess.run(cmd, capture_output=True, text=True)
+            proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
             env = _parse_envelope(proc.stdout) or _parse_envelope(proc.stderr)
             ok = bool(env and env.get("Result") == "Success")
             trail_uip(cmd, ok, int((time.monotonic() - started) * 1000))
@@ -675,18 +681,18 @@ class Workspace:
 
     def read(self, name: str, default: Any = None) -> Any:
         p = self.root / name
-        return json.loads(p.read_text()) if p.exists() else default
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else default
 
     def write(self, name: str, data: Any) -> Path:
         p = self.path(name)
-        p.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+        p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
         return p
 
 
 def history_log(entry: dict) -> None:
     log_dir = Path.home() / ".claude" / "logs" / "xray-tm-sync"
     log_dir.mkdir(parents=True, exist_ok=True)
-    with (log_dir / "history.log").open("a") as f:
+    with (log_dir / "history.log").open("a", encoding="utf-8") as f:
         f.write(json.dumps({"time": local_timestamp(), **entry}, ensure_ascii=False) + "\n")
 
 
@@ -738,7 +744,7 @@ def cmd_check(args: argparse.Namespace) -> int:
 def cmd_pull(args: argparse.Namespace) -> int:
     ws = Workspace(Path(args.workdir))
     if args.fixture:
-        pages = json.loads(Path(args.fixture).read_text())
+        pages = json.loads(Path(args.fixture).read_text(encoding="utf-8"))
         raw_tests = [t for page in pages for t in page["data"]["page"]["results"]]
     else:
         raw_tests = list(XrayClient().iter_tests(args.jql, args.since, expand=not args.no_expand))

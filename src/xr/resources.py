@@ -131,7 +131,7 @@ def cmd_login(args: argparse.Namespace) -> tuple[str, Any]:
         lines.append(f"XRAY_REGION={args.region}")
     path.touch(mode=0o600)
     path.chmod(0o600)
-    path.write_text("\n".join(lines) + "\n")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return "Login", {"Status": "Logged in", "SecretsFile": str(path), "BaseUrl": sync.xray_base_url()}
 
 
@@ -247,7 +247,7 @@ def test_execution_row(raw: dict) -> dict:
 
 def cmd_testexecutions(args: argparse.Namespace) -> tuple[str, Any]:
     if args.action == "import":
-        payload = json.loads(Path(args.file).read_text())
+        payload = json.loads(Path(args.file).read_text(encoding="utf-8"))
         tests = payload.get("tests") or []
         summary = {"Summary": (payload.get("info") or {}).get("summary"), "Project": (payload.get("info") or {}).get("project"),
                    "Tests": len(tests), "TestKeys": [t.get("testKey") for t in tests]}

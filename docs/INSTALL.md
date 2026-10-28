@@ -31,9 +31,9 @@ On the **first** sync, `xr sync` creates two custom fields in your TM project, `
 
 | Tool | Install | Check |
 |---|---|---|
-| **Node.js** (LTS) | [nodejs.org](https://nodejs.org) or `brew install node` | `node --version` |
-| **uv** (installs `xr`) | `brew install uv` or [docs.astral.sh/uv](https://docs.astral.sh/uv/) | `uv --version` |
-| **git** | preinstalled on macOS, or [git-scm.com](https://git-scm.com) | `git --version` |
+| **Node.js** (LTS) | [nodejs.org](https://nodejs.org), `brew install node` (macOS) or `winget install OpenJS.NodeJS.LTS` (Windows) | `node --version` |
+| **uv** (installs `xr`) | `brew install uv` (macOS), `winget install astral-sh.uv` (Windows) or [docs.astral.sh/uv](https://docs.astral.sh/uv/) | `uv --version` |
+| **git** | preinstalled on macOS, `winget install Git.Git` (Windows) or [git-scm.com](https://git-scm.com) | `git --version` |
 | **UiPath CLI `uip`** | `npm install -g @uipath/cli` | `uip --version` (this guide was tested with 1.203) |
 
 You don't need to install Python yourself, because uv fetches it when it is needed.
@@ -94,7 +94,7 @@ xr login              # prompts for the Client ID and the Client Secret, verifie
 xr login status       # "Status": "Logged in"
 ```
 
-- `xr login` writes `~/.config/xray-tm-sync/xray.env` with mode 600 and refuses to use it if other users can read it.
+- `xr login` writes `~/.config/xray-tm-sync/xray.env` with mode 600 and refuses to use it if other users can read it. On Windows the file is `%USERPROFILE%\.config\xray-tm-sync\xray.env`; Windows has no mode bits, so `xr` skips that check there and the folder's normal user permissions protect the file.
 - The file is plain `KEY=value` lines. You normally never write it by hand, but this is what `xr login` produces, and what you create yourself (then `chmod 600`) if you can't run `xr login`:
 
   ```
@@ -146,6 +146,10 @@ What stays outside the project, whichever way you install the skills:
 | `xray-tm-demo` | `xr demo`: seed, mock run and reset in a registered sandbox |
 
 Update later with `uv tool upgrade xr`.
+
+**Windows.** Everything above works in PowerShell. Open a new terminal after installing Node.js, uv and git so they are on the PATH, and after `uv tool install` run `uv tool update-shell` once if `xr` isn't found. `~` in this guide means `%USERPROFILE%`. The demo recording scripts under `docs/demo/*.sh` need Git Bash or WSL; `xr` itself doesn't.
+
+**Working inside a clone of this repository.** The repository ignores its own `.claude/` folder, so it contains no ready-made skill setup. Install the skills as above (`--local` for this clone, or globally). If you see a `.claude/settings.local.json` in your clone, it is your own Claude Code setting for that folder and is never committed. The maintainer's, for example, holds `{"skillOverrides": {"xray": "name-only"}}`, which makes Claude Code list the `xray` skill by name only, without its description. It is optional and has nothing to do with `xr` or the sync.
 
 ---
 

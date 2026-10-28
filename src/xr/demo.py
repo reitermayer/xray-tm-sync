@@ -31,7 +31,7 @@ def sandbox_file() -> Path:
 
 
 def require_sandbox(args: argparse.Namespace) -> None:
-    pairs = json.loads(sandbox_file().read_text()) if sandbox_file().exists() else []
+    pairs = json.loads(sandbox_file().read_text(encoding="utf-8")) if sandbox_file().exists() else []
     if {"xray_project": args.xray_project, "tm_project": args.tm_project} not in pairs:
         raise IntakeError(
             f"Jira project {args.xray_project} + TM project {args.tm_project} is not a registered demo sandbox "
@@ -87,7 +87,7 @@ class DemoTm(core.TmCli):
 
 def cmd_sandbox(args: argparse.Namespace) -> int:
     path = sandbox_file()
-    pairs = json.loads(path.read_text()) if path.exists() else []
+    pairs = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
     if args.action == "add":
         if not (args.xray_project and args.tm_project):
             raise IntakeError("sandbox add needs --xray-project and --tm-project.")
@@ -95,11 +95,11 @@ def cmd_sandbox(args: argparse.Namespace) -> int:
         if pair not in pairs:
             pairs.append(pair)
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(pairs, indent=2))
+            path.write_text(json.dumps(pairs, indent=2), encoding="utf-8")
     elif args.action == "remove":
         pairs = [p for p in pairs if p != {"xray_project": args.xray_project, "tm_project": args.tm_project}]
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(pairs, indent=2))
+        path.write_text(json.dumps(pairs, indent=2), encoding="utf-8")
     emit({"sandbox_file": str(path), "sandboxes": pairs})
     return 0
 
@@ -108,7 +108,7 @@ def cmd_sandbox(args: argparse.Namespace) -> int:
 
 
 def load_seed(path: str) -> dict:
-    return json.loads(Path(path).read_text())
+    return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
 def create_seed(xray: DemoXray, jira_project: str, seed: dict) -> dict:
@@ -167,7 +167,7 @@ def cmd_execute(args: argparse.Namespace) -> int:
     require_sandbox(args)
     ws = Workspace(Path(args.workdir))
     tm = DemoTm(args.tm_project)
-    outcomes = json.loads(Path(args.outcomes).read_text()) if args.outcomes else {}
+    outcomes = json.loads(Path(args.outcomes).read_text(encoding="utf-8")) if args.outcomes else {}
 
     members = tm.tm("testsets", "list-testcases", "--test-set-key", args.tm_test_set) or []
     if not members:
@@ -287,7 +287,7 @@ def cmd_reset(args: argparse.Namespace) -> int:
                                                for e in tm.list_executions(ts["Id"])]
     known = {e["execution_id"] for e in plan["tm_test_executions"]}
     for f in sorted(ws.root.glob("execution-*.json")) if ws.root.exists() else []:
-        rec = json.loads(f.read_text())
+        rec = json.loads(f.read_text(encoding="utf-8"))
         if rec.get("tm_project") == tm.project and rec.get("xray_project") == args.xray_project \
                 and rec["execution_id"] not in known:
             plan["tm_test_executions"].append({"execution_id": rec["execution_id"],
@@ -351,7 +351,7 @@ def cmd_reset(args: argparse.Namespace) -> int:
     if ws.root.exists():
         deleted_runs = {e["execution_id"] for e in plan["tm_test_executions"]}
         for f in ws.root.glob("execution-*.json"):
-            if json.loads(f.read_text())["execution_id"] in deleted_runs:
+            if json.loads(f.read_text(encoding="utf-8"))["execution_id"] in deleted_runs:
                 f.unlink()
         deleted_xray = {e["xray_key"] for e in plan["xray_test_executions"]} if xray_deletes_allowed else set()
         ws.write("xray-executions.json", [e for e in (ws.read("xray-executions.json") or [])
