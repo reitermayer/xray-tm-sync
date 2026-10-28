@@ -50,7 +50,7 @@ uip login status               # shows "Logged in", your organization and your t
 For example, on the UiPath staging cloud:
 
 ```bash
-uip login --authority https://staging.uipath.com --organization reitermayer --tenant AgenticTesting
+uip login --authority https://staging.uipath.com --organization <organization> --tenant <tenant>
 ```
 
 - `uip` stores the OAuth tokens and refreshes them on its own. Neither `xr` nor the skills ever see a UiPath password.
@@ -95,7 +95,16 @@ xr login status       # "Status": "Logged in"
 ```
 
 - `xr login` writes `~/.config/xray-tm-sync/xray.env` with mode 600 and refuses to use it if other users can read it.
-- Optional lines in that file: `XRAY_REGION=eu` (global is the default; us, eu, au), and `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` if `xr project list` should list every Jira project (an Xray API key can't).
+- The file is plain `KEY=value` lines. You normally never write it by hand, but this is what `xr login` produces, and what you create yourself (then `chmod 600`) if you can't run `xr login`:
+
+  ```
+  XRAY_CLIENT_ID=<client id>
+  XRAY_CLIENT_SECRET=<client secret>
+  # XRAY_REGION=eu
+  # XRAY_JIRA_BASE_URL=https://yoursite.atlassian.net
+  ```
+
+- Optional lines: `XRAY_REGION` (global is the default; us, eu, au) picks the Xray host (`eu.xray.cloud.getxray.app`, and so on), so set it to the region your Xray app runs in. `XRAY_JIRA_BASE_URL` makes links in TM descriptions. `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` let `xr project list` list every Jira project (an Xray API key can't).
 - Environment variables with the same names override the file. That is the way to go in CI, where the pipeline's secret store sets them, or use `xr login --client-id <id> --client-secret-stdin`.
 - If you need a different location, set `XRAY_TM_SYNC_ENV=/path/to/file`.
 - **Never** put the key into the repository, a command line or a prompt. If you paste it into a chat with an agent, it is in that transcript, so rotate it in Jira.
@@ -114,7 +123,21 @@ xr --version
 uip skills install --repo reitermayer/xray-tm-sync --agent claude
 ```
 
-`--agent` takes any coding agent `uip skills` supports: `claude`, `cursor`, `copilot`, `codex`, `opencode`, `autopilot`, `kiro`, `windsurf`, `antigravity`, `devin`. Add `--local` to install into the current project only. Without `uip`: copy the folders under `skills/` into your agent's skills folder (for Claude Code `~/.claude/skills/`).
+`--agent` takes any coding agent `uip skills` supports: `claude`, `cursor`, `copilot`, `codex`, `opencode`, `autopilot`, `kiro`, `windsurf`, `antigravity`, `devin`. Add `--local` to install into the current project only (or `--path <dir>` for another project folder). Without `uip`: copy the folders under `skills/` into your agent's skills folder (for Claude Code `~/.claude/skills/`).
+
+**Project-only install.** Run this inside your project folder:
+
+```bash
+uip skills install --repo reitermayer/xray-tm-sync --agent claude --local
+```
+
+For Claude Code it puts the three skills in `<project>/.claude/skills/{xray,xray-tm-sync,xray-tm-demo}`, so they apply only in that project. `uip` also keeps a cached copy of the repository under `<project>/.uipath/.skill-repos/` and adds that folder to the project's `.gitignore`. Commit `.claude/skills/` if you want teammates to get the skills with the project; leave `.uipath/` out.
+
+What stays outside the project, whichever way you install the skills:
+
+- `xr` itself is installed once with `uv tool install` and must be on your PATH. The skills only teach the agent to call it.
+- The Xray key stays in `~/.config/xray-tm-sync/xray.env` (or environment variables), so a project install never carries credentials.
+- The sync's own state goes to `.xray-tm-sync/` in the folder where you run `xr`.
 
 | Skill | Teaches the agent |
 |---|---|
@@ -190,6 +213,16 @@ xr demo sandbox add --xray-project DEMO --tm-project DEMO
 xr demo reset --xray-project DEMO --tm-project DEMO --reseed          # dry run
 xr demo reset --xray-project DEMO --tm-project DEMO --reseed --yes    # 8 stock-trading Xray tests
 ```
+
+`sandbox add` creates `~/.config/xray-tm-demo/sandboxes.json` (and the folder) on first use. The file is a list of registered pairs:
+
+```json
+[
+  {"xray_project": "DEMO", "tm_project": "DEMO"}
+]
+```
+
+`xr demo sandbox` lists the pairs, `xr demo sandbox remove --xray-project ... --tm-project ...` unregisters one, and `XRAY_TM_DEMO_SANDBOXES=/path/to/file` uses another location. If you run `xr demo` before registering, it stops with `... is not a registered demo sandbox`. That is the guard working. Register the pair, but only if both projects really are sandboxes. The sync and `report` commands never need this file.
 
 ---
 
